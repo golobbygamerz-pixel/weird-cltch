@@ -497,7 +497,7 @@ function App() {
         <section className="hero">
           <div className="hero-image-wrap">
             <img
-              src={image("IMG_0922.jpeg")}
+              src={image("IMG_0915.jpeg")}
               alt="WEIRD CULTURE streetwear"
               className="hero-image"
             />
