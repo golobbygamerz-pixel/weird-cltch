@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   ArrowDown,
   ArrowRight,
   ShoppingBag,
-  ChevronDown,
   Menu,
   Search,
-  X
+  X,
+  Plus,
+  Minus,
+  Trash2
 } from "lucide-react";
 import "./styles.css";
 
@@ -18,53 +20,60 @@ const products = [
   {
     id: 1,
     name: "Printed Full Sleeve",
-    price: "₹1,899",
+    price: 1899,
     image: image("IMG_0905.jpeg"),
-    tag: "NEW DROP"
+    category: "LONG SLEEVES"
   },
   {
     id: 2,
     name: "Branded Relaxed Fit",
-    price: "₹1,699",
-    image: image("IMG_0906.jpeg")
+    price: 1699,
+    image: image("IMG_0906.jpeg"),
+    category: "TEES"
   },
   {
     id: 3,
     name: "Baggy Track — 2 Line",
-    price: "₹1,999",
-    image: image("IMG_0907.jpeg")
+    price: 1999,
+    image: image("IMG_0907.jpeg"),
+    category: "PANTS"
   },
   {
     id: 4,
     name: "Heavy Printed Long Sleeve",
-    price: "₹1,899",
+    price: 1899,
     image: image("IMG_0908.jpeg"),
-    tag: "NEW"
+    category: "LONG SLEEVES",
+    tag: "NEW DROP"
   },
   {
     id: 5,
     name: "Real Tree Camo Cargo",
-    price: "₹2,499",
+    price: 2499,
     image: image("IMG_0909.jpeg"),
+    category: "PANTS",
     tag: "NEW DROP"
   },
   {
     id: 6,
     name: "Oversized Graphic Tee",
-    price: "₹1,599",
-    image: image("IMG_0910.jpeg")
+    price: 1599,
+    image: image("IMG_0910.jpeg"),
+    category: "TEES"
   },
   {
     id: 7,
     name: "Underground Jersey",
-    price: "₹1,999",
-    image: image("IMG_0911.jpeg")
+    price: 1999,
+    image: image("IMG_0911.jpeg"),
+    category: "JERSEYS"
   },
   {
     id: 8,
     name: "Vintage Washed Tee",
-    price: "₹1,799",
-    image: image("IMG_0912.jpeg")
+    price: 1799,
+    image: image("IMG_0912.jpeg"),
+    category: "TEES"
   }
 ];
 
@@ -77,83 +86,148 @@ const categories = [
   "NEW DROP"
 ];
 
+const money = (value) =>
+  `₹${value.toLocaleString("en-IN")}`;
+
 function App() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [cartCount, setCartCount] = useState(0);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [cart, setCart] = useState([]);
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    document.body.style.overflow = menuOpen ? "hidden" : "";
+    document.body.style.overflow =
+      menuOpen || cartOpen ? "hidden" : "";
 
     return () => {
       document.body.style.overflow = "";
     };
-  }, [menuOpen]);
+  }, [menuOpen, cartOpen]);
 
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch = product.name
-      .toLowerCase()
-      .includes(search.toLowerCase());
+  const cartCount = cart.reduce(
+    (total, item) => total + item.quantity,
+    0
+  );
 
-    if (activeCategory === "ALL") {
-      return matchesSearch;
-    }
+  const cartTotal = cart.reduce(
+    (total, item) => total + item.price * item.quantity,
+    0
+  );
 
-    if (activeCategory === "NEW DROP") {
-      return product.tag && matchesSearch;
-    }
+  const filteredProducts = useMemo(() => {
+    const query = search.trim().toLowerCase();
 
-    const category = activeCategory.toLowerCase();
+    return products.filter((product) => {
+      const matchesSearch = product.name
+        .toLowerCase()
+        .includes(query);
 
-    if (category === "tees") {
-      return (
-        product.name.toLowerCase().includes("tee") &&
-        matchesSearch
+      if (!matchesSearch) return false;
+
+      if (activeCategory === "ALL") return true;
+
+      if (activeCategory === "NEW DROP") {
+        return product.tag === "NEW DROP";
+      }
+
+      return product.category === activeCategory;
+    });
+  }, [activeCategory, search]);
+
+  const addToCart = (product) => {
+    setCart((currentCart) => {
+      const existing = currentCart.find(
+        (item) => item.id === product.id
       );
-    }
 
-    if (category === "long sleeves") {
-      return (
-        product.name.toLowerCase().includes("sleeve") &&
-        matchesSearch
-      );
-    }
+      if (existing) {
+        return currentCart.map((item) =>
+          item.id === product.id
+            ? {
+                ...item,
+                quantity: item.quantity + 1
+              }
+            : item
+        );
+      }
 
-    if (category === "jerseys") {
-      return (
-        product.name.toLowerCase().includes("jersey") &&
-        matchesSearch
-      );
-    }
+      return [
+        ...currentCart,
+        {
+          ...product,
+          quantity: 1
+        }
+      ];
+    });
 
-    if (category === "pants") {
-      return (
-        product.name.toLowerCase().includes("pant") ||
-        product.name.toLowerCase().includes("cargo") ||
-        product.name.toLowerCase().includes("track")
-      ) && matchesSearch;
-    }
+    setCartOpen(true);
+  };
 
-    return matchesSearch;
-  });
+  const increaseQuantity = (id) => {
+    setCart((currentCart) =>
+      currentCart.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              quantity: item.quantity + 1
+            }
+          : item
+      )
+    );
+  };
 
-  const addToCart = () => {
-    setCartCount((count) => count + 1);
+  const decreaseQuantity = (id) => {
+    setCart((currentCart) =>
+      currentCart
+        .map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                quantity: item.quantity - 1
+              }
+            : item
+        )
+        .filter((item) => item.quantity > 0)
+    );
+  };
+
+  const removeFromCart = (id) => {
+    setCart((currentCart) =>
+      currentCart.filter((item) => item.id !== id)
+    );
   };
 
   const scrollToProducts = () => {
-    document
-      .getElementById("shop")
-      ?.scrollIntoView({ behavior: "smooth" });
+    setActiveCategory("ALL");
+
+    setTimeout(() => {
+      document
+        .getElementById("shop")
+        ?.scrollIntoView({ behavior: "smooth" });
+    }, 50);
   };
+
+  const scrollToNewDrop = () => {
+    setActiveCategory("NEW DROP");
+
+    setTimeout(() => {
+      document
+        .getElementById("shop")
+        ?.scrollIntoView({ behavior: "smooth" });
+    }, 50);
+  };
+
+  const closeMenu = () => setMenuOpen(false);
 
   return (
     <div className="site">
       <div className="top-strip">
         <p>FREE SHIPPING ON ORDERS ABOVE ₹1999</p>
-        <p className="top-strip-right">WEIRD GANG WORLDWIDE</p>
+        <p className="top-strip-right">
+          WEIRD GANG WORLDWIDE
+        </p>
       </div>
 
       <header className="header">
@@ -172,7 +246,11 @@ function App() {
 
         <nav className="desktop-nav">
           <a href="#shop">SHOP</a>
-          <a href="#new-drop">NEW DROP</a>
+
+          <button onClick={scrollToNewDrop}>
+            NEW DROP
+          </button>
+
           <a href="#collections">COLLECTIONS</a>
           <a href="#weird-gang">WEIRD GANG</a>
         </nav>
@@ -187,9 +265,11 @@ function App() {
           </button>
 
           <button
-            className="cart-btn"
-            onClick={scrollToProducts}
-            aria-label="Cart"
+            className={`cart-btn ${
+              cartCount > 0 ? "has-items" : ""
+            }`}
+            onClick={() => setCartOpen(true)}
+            aria-label="Open cart"
           >
             <ShoppingBag size={19} />
             <span>{cartCount}</span>
@@ -199,7 +279,7 @@ function App() {
 
       {searchOpen && (
         <div className="search-panel">
-          <Search size={20} />
+          <Search size={19} />
 
           <input
             autoFocus
@@ -227,26 +307,31 @@ function App() {
 
             <button
               className="icon-btn"
-              onClick={() => setMenuOpen(false)}
+              onClick={closeMenu}
             >
               <X size={23} />
             </button>
           </div>
 
           <nav>
-            <a href="#shop" onClick={() => setMenuOpen(false)}>
+            <a href="#shop" onClick={closeMenu}>
               SHOP
             </a>
 
-            <a href="#new-drop" onClick={() => setMenuOpen(false)}>
+            <button
+              onClick={() => {
+                closeMenu();
+                scrollToNewDrop();
+              }}
+            >
               NEW DROP
-            </a>
+            </button>
 
-            <a href="#collections" onClick={() => setMenuOpen(false)}>
+            <a href="#collections" onClick={closeMenu}>
               COLLECTIONS
             </a>
 
-            <a href="#weird-gang" onClick={() => setMenuOpen(false)}>
+            <a href="#weird-gang" onClick={closeMenu}>
               WEIRD GANG
             </a>
           </nav>
@@ -257,6 +342,156 @@ function App() {
           </div>
         </div>
       )}
+
+      {cartOpen && (
+        <div
+          className="cart-backdrop"
+          onClick={() => setCartOpen(false)}
+        />
+      )}
+
+      <aside className={`cart-drawer ${cartOpen ? "open" : ""}`}>
+        <div className="cart-header">
+          <div>
+            <span className="cart-kicker">
+              YOUR BAG
+            </span>
+
+            <h2>
+              CART
+              <span>{cartCount}</span>
+            </h2>
+          </div>
+
+          <button
+            className="drawer-close"
+            onClick={() => setCartOpen(false)}
+            aria-label="Close cart"
+          >
+            <X size={21} />
+          </button>
+        </div>
+
+        {cart.length === 0 ? (
+          <div className="cart-empty">
+            <ShoppingBag size={36} strokeWidth={1.2} />
+
+            <h3>YOUR BAG IS EMPTY.</h3>
+
+            <p>
+              NOTHING WEIRD IN HERE YET.
+            </p>
+
+            <button
+              className="cart-shop-btn"
+              onClick={() => {
+                setCartOpen(false);
+                scrollToProducts();
+              }}
+            >
+              SHOP THE CULTURE
+              <ArrowRight size={16} />
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="cart-items">
+              {cart.map((item) => (
+                <div className="cart-item" key={item.id}>
+                  <div className="cart-item-image">
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                    />
+                  </div>
+
+                  <div className="cart-item-info">
+                    <div className="cart-item-top">
+                      <div>
+                        <h3>{item.name}</h3>
+
+                        {item.tag && (
+                          <span>{item.tag}</span>
+                        )}
+                      </div>
+
+                      <button
+                        className="remove-btn"
+                        onClick={() =>
+                          removeFromCart(item.id)
+                        }
+                        aria-label={`Remove ${item.name}`}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+
+                    <div className="cart-item-bottom">
+                      <div className="quantity-control">
+                        <button
+                          onClick={() =>
+                            decreaseQuantity(item.id)
+                          }
+                          aria-label="Decrease quantity"
+                        >
+                          <Minus size={13} />
+                        </button>
+
+                        <span>{item.quantity}</span>
+
+                        <button
+                          onClick={() =>
+                            increaseQuantity(item.id)
+                          }
+                          aria-label="Increase quantity"
+                        >
+                          <Plus size={13} />
+                        </button>
+                      </div>
+
+                      <strong>
+                        {money(
+                          item.price * item.quantity
+                        )}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="cart-footer">
+              <div className="cart-total">
+                <span>SUBTOTAL</span>
+                <strong>{money(cartTotal)}</strong>
+              </div>
+
+              <p className="cart-note">
+                SHIPPING CALCULATED AT CHECKOUT
+              </p>
+
+              <button
+                className="checkout-btn"
+                onClick={() =>
+                  alert(
+                    "Checkout is ready to connect with your payment/order system."
+                  )
+                }
+              >
+                CHECKOUT
+                <ArrowRight size={17} />
+              </button>
+
+              <button
+                className="continue-btn"
+                onClick={() => setCartOpen(false)}
+              >
+                CONTINUE SHOPPING
+              </button>
+            </div>
+          </>
+        )}
+      </aside>
 
       <main>
         <section className="hero">
@@ -293,8 +528,8 @@ function App() {
                 className="primary-btn"
                 onClick={scrollToProducts}
               >
-                SHOP THE DROP
-                <ArrowRight size={18} />
+                <span>SHOP THE CULTURE</span>
+                <ArrowRight size={17} />
               </button>
             </div>
           </div>
@@ -323,7 +558,10 @@ function App() {
         <section className="shop-section" id="shop">
           <div className="section-head">
             <div>
-              <span className="section-label">01 / SHOP</span>
+              <span className="section-label">
+                01 / SHOP
+              </span>
+
               <h2>THE CULTURE</h2>
             </div>
 
@@ -339,13 +577,33 @@ function App() {
               <button
                 key={category}
                 className={
-                  activeCategory === category ? "active" : ""
+                  activeCategory === category
+                    ? "active"
+                    : ""
                 }
-                onClick={() => setActiveCategory(category)}
+                onClick={() =>
+                  setActiveCategory(category)
+                }
               >
                 {category}
+
+                {category === "NEW DROP" && (
+                  <span className="category-dot" />
+                )}
               </button>
             ))}
+          </div>
+
+          <div className="shop-status">
+            <span>
+              {activeCategory === "NEW DROP"
+                ? "LATEST DROP"
+                : "ALL PIECES"}
+            </span>
+
+            <span>
+              {filteredProducts.length} PRODUCTS
+            </span>
           </div>
 
           <div className="product-grid">
@@ -373,9 +631,9 @@ function App() {
 
                   <button
                     className="quick-add"
-                    onClick={addToCart}
+                    onClick={() => addToCart(product)}
                   >
-                    ADD TO BAG
+                    <span>ADD TO BAG</span>
                     <ArrowRight size={15} />
                   </button>
                 </div>
@@ -383,10 +641,15 @@ function App() {
                 <div className="product-info">
                   <div>
                     <h3>{product.name}</h3>
-                    <span>WEIRD CULTURE</span>
+
+                    <span>
+                      {product.tag || "WEIRD CULTURE"}
+                    </span>
                   </div>
 
-                  <strong>{product.price}</strong>
+                  <strong>
+                    {money(product.price)}
+                  </strong>
                 </div>
               </article>
             ))}
@@ -396,15 +659,28 @@ function App() {
             <div className="empty-state">
               <h3>NOTHING FOUND.</h3>
               <p>TRY ANOTHER SEARCH.</p>
+
+              <button
+                onClick={() => {
+                  setSearch("");
+                  setActiveCategory("ALL");
+                }}
+              >
+                RESET SHOP
+              </button>
             </div>
           )}
         </section>
 
         <section className="statement" id="new-drop">
-          <div className="statement-no">02 / NEW DROP</div>
+          <div className="statement-no">
+            02 / NEW DROP
+          </div>
 
           <div className="statement-content">
-            <p className="statement-small">THIS IS NOT A TREND.</p>
+            <p className="statement-small">
+              JUST LANDED / 2026
+            </p>
 
             <h2>
               STAY
@@ -413,18 +689,23 @@ function App() {
             </h2>
 
             <p className="statement-copy">
-              BUILT FOR THE ONES WHO DON'T FIT THE
+              THE LATEST PIECES FROM WEIRD CULTURE.
               <br />
-              MOULD. BOLD GRAPHICS. OVERSIZED FITS.
+              HEAVY GRAPHICS. OVERSIZED FITS.
               <br />
-              RAW ENERGY.
+              RAW ENERGY. NOTHING NORMAL.
             </p>
+
+            <div className="new-drop-pills">
+              <span>01 / HEAVY PRINTED LS</span>
+              <span>02 / REAL TREE CARGO</span>
+            </div>
 
             <button
               className="outline-btn"
-              onClick={scrollToProducts}
+              onClick={scrollToNewDrop}
             >
-              EXPLORE NEW DROP
+              <span>SHOP NEW DROP</span>
               <ArrowRight size={17} />
             </button>
           </div>
@@ -432,12 +713,21 @@ function App() {
           <div className="statement-image">
             <img
               src={image("IMG_0913.jpeg")}
-              alt="New Weird Culture collection"
+              alt="WEIRD CULTURE New Drop"
             />
+
+            <div className="new-drop-stamp">
+              NEW
+              <strong>DROP</strong>
+              2026
+            </div>
           </div>
         </section>
 
-        <section className="collection-section" id="collections">
+        <section
+          className="collection-section"
+          id="collections"
+        >
           <div className="collection-header">
             <span className="section-label">
               03 / COLLECTIONS
@@ -474,7 +764,16 @@ function App() {
                 <span>02</span>
                 <h3>BAGGY PANTS</h3>
 
-                <button onClick={scrollToProducts}>
+                <button
+                  onClick={() => {
+                    setActiveCategory("PANTS");
+                    document
+                      .getElementById("shop")
+                      ?.scrollIntoView({
+                        behavior: "smooth"
+                      });
+                  }}
+                >
                   EXPLORE
                   <ArrowRight size={15} />
                 </button>
@@ -491,7 +790,16 @@ function App() {
                 <span>03</span>
                 <h3>JERSEYS</h3>
 
-                <button onClick={scrollToProducts}>
+                <button
+                  onClick={() => {
+                    setActiveCategory("JERSEYS");
+                    document
+                      .getElementById("shop")
+                      ?.scrollIntoView({
+                        behavior: "smooth"
+                      });
+                  }}
+                >
                   EXPLORE
                   <ArrowRight size={15} />
                 </button>
@@ -500,7 +808,10 @@ function App() {
           </div>
         </section>
 
-        <section className="gang-section" id="weird-gang">
+        <section
+          className="gang-section"
+          id="weird-gang"
+        >
           <div className="gang-content">
             <span className="section-label">
               04 / WEIRD GANG
@@ -521,7 +832,7 @@ function App() {
             </p>
 
             <button className="primary-btn">
-              @WEIRDCULTURE
+              <span>@WEIRDCULTURE</span>
               <ArrowRight size={18} />
             </button>
           </div>
@@ -592,8 +903,14 @@ function App() {
             <div>
               <span>SHOP</span>
               <a href="#shop">ALL PRODUCTS</a>
-              <a href="#new-drop">NEW DROP</a>
-              <a href="#collections">COLLECTIONS</a>
+
+              <button onClick={scrollToNewDrop}>
+                NEW DROP
+              </button>
+
+              <a href="#collections">
+                COLLECTIONS
+              </a>
             </div>
 
             <div>
@@ -606,7 +923,9 @@ function App() {
             <div>
               <span>SOCIAL</span>
               <a href="#">INSTAGRAM</a>
-              <a href="#">WEIRD GANG</a>
+              <a href="#weird-gang">
+                WEIRD GANG
+              </a>
             </div>
           </div>
         </div>
