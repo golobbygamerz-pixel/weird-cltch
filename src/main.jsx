@@ -11,57 +11,60 @@ import {
 } from "lucide-react";
 import "./styles.css";
 
+const image = (name) =>
+  `${import.meta.env.BASE_URL}images/${name}`;
+
 const products = [
   {
     id: 1,
     name: "Printed Full Sleeve",
     price: "₹1,899",
-    image: "/images/IMG_0905.jpeg",
+    image: image("IMG_0905.jpeg"),
     tag: "NEW DROP"
   },
   {
     id: 2,
     name: "Branded Relaxed Fit",
     price: "₹1,699",
-    image: "/images/IMG_0906.jpeg"
+    image: image("IMG_0906.jpeg")
   },
   {
     id: 3,
     name: "Baggy Track — 2 Line",
     price: "₹1,999",
-    image: "/images/IMG_0907.jpeg"
+    image: image("IMG_0907.jpeg")
   },
   {
     id: 4,
     name: "Heavy Printed Long Sleeve",
     price: "₹1,899",
-    image: "/images/IMG_0908.jpeg",
+    image: image("IMG_0908.jpeg"),
     tag: "NEW"
   },
   {
     id: 5,
     name: "Real Tree Camo Cargo",
     price: "₹2,499",
-    image: "/images/IMG_0909.jpeg",
+    image: image("IMG_0909.jpeg"),
     tag: "NEW DROP"
   },
   {
     id: 6,
     name: "Oversized Graphic Tee",
     price: "₹1,599",
-    image: "/images/IMG_0910.jpeg"
+    image: image("IMG_0910.jpeg")
   },
   {
     id: 7,
     name: "Underground Jersey",
     price: "₹1,999",
-    image: "/images/IMG_0911.jpeg"
+    image: image("IMG_0911.jpeg")
   },
   {
     id: 8,
     name: "Vintage Washed Tee",
     price: "₹1,799",
-    image: "/images/IMG_0912.jpeg"
+    image: image("IMG_0912.jpeg")
   }
 ];
 
@@ -259,7 +262,7 @@ function App() {
         <section className="hero">
           <div className="hero-image-wrap">
             <img
-              src="/images/IMG_0905.jpeg"
+              src={image("IMG_0905.jpeg")}
               alt="WEIRD CULTURE streetwear"
               className="hero-image"
             />
@@ -428,7 +431,7 @@ function App() {
 
           <div className="statement-image">
             <img
-              src="/images/IMG_0913.jpeg"
+              src={image("IMG_0913.jpeg")}
               alt="New Weird Culture collection"
             />
           </div>
@@ -446,7 +449,7 @@ function App() {
           <div className="collection-grid">
             <div className="collection-card collection-wide">
               <img
-                src="/images/IMG_0914.jpeg"
+                src={image("IMG_0914.jpeg")}
                 alt="Tees collection"
               />
 
@@ -463,7 +466,7 @@ function App() {
 
             <div className="collection-card">
               <img
-                src="/images/IMG_0915.jpeg"
+                src={image("IMG_0915.jpeg")}
                 alt="Pants collection"
               />
 
@@ -480,7 +483,7 @@ function App() {
 
             <div className="collection-card">
               <img
-                src="/images/IMG_0916.jpeg"
+                src={image("IMG_0916.jpeg")}
                 alt="Jersey collection"
               />
 
@@ -525,7 +528,7 @@ function App() {
 
           <div className="gang-image">
             <img
-              src="/images/IMG_0911.jpeg"
+              src={image("IMG_0911.jpeg")}
               alt="WEIRD GANG"
             />
 
