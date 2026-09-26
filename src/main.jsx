@@ -9,12 +9,15 @@ import {
   X,
   Plus,
   Minus,
-  Trash2
+  Trash2,
+  Check
 } from "lucide-react";
 import "./styles.css";
 
 const image = (name) =>
   `${import.meta.env.BASE_URL}images/${name}`;
+
+const sizes = ["S", "M", "L", "XL", "XXL"];
 
 const products = [
   {
@@ -22,20 +25,64 @@ const products = [
     name: "Printed Full Sleeve",
     price: 1899,
     image: image("IMG_0905.jpeg"),
-    category: "LONG SLEEVES"
+    category: "LONG SLEEVES",
+    hasOptions: true,
+    optionType: "printed",
+    variants: [
+      {
+        name: "DESIGN 01",
+        image: image("IMG_0905.jpeg")
+      },
+      {
+        name: "DESIGN 02",
+        image: image("IMG_0906.jpeg")
+      },
+      {
+        name: "DESIGN 03",
+        image: image("IMG_0907.jpeg")
+      },
+      {
+        name: "DESIGN 04",
+        image: image("IMG_0908.jpeg")
+      }
+    ]
   },
   {
     id: 2,
     name: "Branded Relaxed Fit",
     price: 1699,
-    image: image("IMG_0906.jpeg"),
-    category: "TEES"
+    image: image("IMG_0909.jpeg"),
+    category: "TEES",
+    hasOptions: true,
+    optionType: "relaxed",
+    variants: [
+      {
+        name: "DESIGN 01",
+        color: "BLACK",
+        image: image("IMG_0909.jpeg")
+      },
+      {
+        name: "DESIGN 02",
+        color: "WHITE",
+        image: image("IMG_0910.jpeg")
+      },
+      {
+        name: "DESIGN 03",
+        color: "GREY",
+        image: image("IMG_0911.jpeg")
+      },
+      {
+        name: "DESIGN 04",
+        color: "WASHED BLACK",
+        image: image("IMG_0912.jpeg")
+      }
+    ]
   },
   {
     id: 3,
     name: "Baggy Track — 2 Line",
     price: 1999,
-    image: image("IMG_0907.jpeg"),
+    image: image("IMG_0913.jpeg"),
     category: "PANTS"
   },
   {
@@ -50,7 +97,7 @@ const products = [
     id: 5,
     name: "Real Tree Camo Cargo",
     price: 2499,
-    image: image("IMG_0909.jpeg"),
+    image: image("IMG_0915.jpeg"),
     category: "PANTS",
     tag: "NEW DROP"
   },
@@ -97,14 +144,19 @@ function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState("");
 
+  const [productModal, setProductModal] = useState(null);
+  const [selectedVariant, setSelectedVariant] = useState(0);
+  const [selectedSize, setSelectedSize] = useState("");
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
+
   useEffect(() => {
     document.body.style.overflow =
-      menuOpen || cartOpen ? "hidden" : "";
+      menuOpen || cartOpen || productModal ? "hidden" : "";
 
     return () => {
       document.body.style.overflow = "";
     };
-  }, [menuOpen, cartOpen]);
+  }, [menuOpen, cartOpen, productModal]);
 
   const cartCount = cart.reduce(
     (total, item) => total + item.quantity,
@@ -136,18 +188,47 @@ function App() {
     });
   }, [activeCategory, search]);
 
-  const addToCart = (product) => {
+  const openProductOptions = (product) => {
+    setProductModal(product);
+    setSelectedVariant(0);
+    setSelectedSize("");
+    setSelectedQuantity(1);
+  };
+
+  const closeProductOptions = () => {
+    setProductModal(null);
+    setSelectedVariant(0);
+    setSelectedSize("");
+    setSelectedQuantity(1);
+  };
+
+  const addToCart = (
+    product,
+    variant = null,
+    size = null,
+    quantity = 1
+  ) => {
+    const variantName = variant?.name || "";
+    const color = variant?.color || "";
+
+    const cartKey = [
+      product.id,
+      variantName,
+      color,
+      size || ""
+    ].join("-");
+
     setCart((currentCart) => {
       const existing = currentCart.find(
-        (item) => item.id === product.id
+        (item) => item.cartKey === cartKey
       );
 
       if (existing) {
         return currentCart.map((item) =>
-          item.id === product.id
+          item.cartKey === cartKey
             ? {
                 ...item,
-                quantity: item.quantity + 1
+                quantity: item.quantity + quantity
               }
             : item
         );
@@ -157,7 +238,12 @@ function App() {
         ...currentCart,
         {
           ...product,
-          quantity: 1
+          cartKey,
+          image: variant?.image || product.image,
+          variantName,
+          color,
+          size,
+          quantity
         }
       ];
     });
@@ -165,10 +251,31 @@ function App() {
     setCartOpen(true);
   };
 
+  const handleProductAdd = () => {
+    if (!productModal) return;
+
+    if (!selectedSize) {
+      alert("Please select a size.");
+      return;
+    }
+
+    const variant =
+      productModal.variants?.[selectedVariant] || null;
+
+    addToCart(
+      productModal,
+      variant,
+      selectedSize,
+      selectedQuantity
+    );
+
+    closeProductOptions();
+  };
+
   const increaseQuantity = (id) => {
     setCart((currentCart) =>
       currentCart.map((item) =>
-        item.id === id
+        item.cartKey === id
           ? {
               ...item,
               quantity: item.quantity + 1
@@ -182,7 +289,7 @@ function App() {
     setCart((currentCart) =>
       currentCart
         .map((item) =>
-          item.id === id
+          item.cartKey === id
             ? {
                 ...item,
                 quantity: item.quantity - 1
@@ -195,7 +302,7 @@ function App() {
 
   const removeFromCart = (id) => {
     setCart((currentCart) =>
-      currentCart.filter((item) => item.id !== id)
+      currentCart.filter((item) => item.cartKey !== id)
     );
   };
 
@@ -225,6 +332,7 @@ function App() {
     <div className="site">
       <div className="top-strip">
         <p>FREE SHIPPING ON ORDERS ABOVE ₹1999</p>
+
         <p className="top-strip-right">
           WEIRD GANG WORLDWIDE
         </p>
@@ -251,14 +359,21 @@ function App() {
             NEW DROP
           </button>
 
-          <a href="#collections">COLLECTIONS</a>
-          <a href="#weird-gang">WEIRD GANG</a>
+          <a href="#collections">
+            COLLECTIONS
+          </a>
+
+          <a href="#weird-gang">
+            WEIRD GANG
+          </a>
         </nav>
 
         <div className="header-actions">
           <button
             className="icon-btn search-btn"
-            onClick={() => setSearchOpen((value) => !value)}
+            onClick={() =>
+              setSearchOpen((value) => !value)
+            }
             aria-label="Search"
           >
             <Search size={20} />
@@ -343,6 +458,214 @@ function App() {
         </div>
       )}
 
+      {/* PRODUCT OPTIONS MODAL */}
+
+      {productModal && (
+        <div
+          className="product-modal-backdrop"
+          onClick={closeProductOptions}
+        >
+          <div
+            className="product-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="product-modal-close"
+              onClick={closeProductOptions}
+              aria-label="Close product"
+            >
+              <X size={21} />
+            </button>
+
+            <div className="product-modal-image">
+              <img
+                src={
+                  productModal.variants?.[selectedVariant]
+                    ?.image || productModal.image
+                }
+                alt={productModal.name}
+              />
+
+              {productModal.tag && (
+                <span className="product-modal-tag">
+                  {productModal.tag}
+                </span>
+              )}
+            </div>
+
+            <div className="product-modal-info">
+              <span className="product-modal-category">
+                {productModal.category}
+              </span>
+
+              <h2>{productModal.name}</h2>
+
+              <strong className="product-modal-price">
+                {money(productModal.price)}
+              </strong>
+
+              <div className="option-section">
+                <div className="option-title">
+                  <span>
+                    {productModal.optionType === "relaxed"
+                      ? "DESIGN / COLOR"
+                      : "DESIGN"}
+                  </span>
+
+                  <strong>
+                    {productModal.variants?.[
+                      selectedVariant
+                    ]?.name || ""}
+                  </strong>
+                </div>
+
+                <div className="variant-grid">
+                  {productModal.variants?.map(
+                    (variant, index) => (
+                      <button
+                        key={variant.name}
+                        className={`variant-option ${
+                          selectedVariant === index
+                            ? "selected"
+                            : ""
+                        }`}
+                        onClick={() =>
+                          setSelectedVariant(index)
+                        }
+                      >
+                        <img
+                          src={variant.image}
+                          alt={variant.name}
+                        />
+
+                        <span>
+                          {variant.name}
+                          {variant.color && (
+                            <small>
+                              {variant.color}
+                            </small>
+                          )}
+                        </span>
+
+                        {selectedVariant === index && (
+                          <i>
+                            <Check size={13} />
+                          </i>
+                        )}
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+
+              {productModal.optionType === "relaxed" && (
+                <div className="option-section color-section">
+                  <div className="option-title">
+                    <span>COLOR</span>
+
+                    <strong>
+                      {
+                        productModal.variants?.[
+                          selectedVariant
+                        ]?.color
+                      }
+                    </strong>
+                  </div>
+
+                  <div className="color-options">
+                    {productModal.variants?.map(
+                      (variant, index) => (
+                        <button
+                          key={variant.color}
+                          className={`color-option ${
+                            selectedVariant === index
+                              ? "selected"
+                              : ""
+                          }`}
+                          onClick={() =>
+                            setSelectedVariant(index)
+                          }
+                        >
+                          <span
+                            className={`color-dot color-${variant.color
+                              .toLowerCase()
+                              .replaceAll(" ", "-")}`}
+                          />
+
+                          {variant.color}
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="option-section">
+                <div className="option-title">
+                  <span>SIZE</span>
+
+                  <strong>
+                    {selectedSize || "SELECT SIZE"}
+                  </strong>
+                </div>
+
+                <div className="size-options">
+                  {sizes.map((size) => (
+                    <button
+                      key={size}
+                      className={
+                        selectedSize === size
+                          ? "selected"
+                          : ""
+                      }
+                      onClick={() =>
+                        setSelectedSize(size)
+                      }
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="modal-bottom">
+                <div className="modal-quantity">
+                  <button
+                    onClick={() =>
+                      setSelectedQuantity((value) =>
+                        Math.max(1, value - 1)
+                      )
+                    }
+                  >
+                    <Minus size={14} />
+                  </button>
+
+                  <span>{selectedQuantity}</span>
+
+                  <button
+                    onClick={() =>
+                      setSelectedQuantity(
+                        (value) => value + 1
+                      )
+                    }
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+
+                <button
+                  className="modal-add-btn"
+                  onClick={handleProductAdd}
+                >
+                  <span>ADD TO CART</span>
+                  <ArrowRight size={17} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {cartOpen && (
         <div
           className="cart-backdrop"
@@ -350,7 +673,11 @@ function App() {
         />
       )}
 
-      <aside className={`cart-drawer ${cartOpen ? "open" : ""}`}>
+      <aside
+        className={`cart-drawer ${
+          cartOpen ? "open" : ""
+        }`}
+      >
         <div className="cart-header">
           <div>
             <span className="cart-kicker">
@@ -374,7 +701,10 @@ function App() {
 
         {cart.length === 0 ? (
           <div className="cart-empty">
-            <ShoppingBag size={36} strokeWidth={1.2} />
+            <ShoppingBag
+              size={36}
+              strokeWidth={1.2}
+            />
 
             <h3>YOUR BAG IS EMPTY.</h3>
 
@@ -397,7 +727,10 @@ function App() {
           <>
             <div className="cart-items">
               {cart.map((item) => (
-                <div className="cart-item" key={item.id}>
+                <div
+                  className="cart-item"
+                  key={item.cartKey}
+                >
                   <div className="cart-item-image">
                     <img
                       src={item.image}
@@ -410,15 +743,30 @@ function App() {
                       <div>
                         <h3>{item.name}</h3>
 
-                        {item.tag && (
-                          <span>{item.tag}</span>
+                        {item.variantName && (
+                          <span>
+                            {item.variantName}
+                            {item.color
+                              ? ` · ${item.color}`
+                              : ""}
+                            {item.size
+                              ? ` · SIZE ${item.size}`
+                              : ""}
+                          </span>
                         )}
+
+                        {!item.variantName &&
+                          item.tag && (
+                            <span>
+                              {item.tag}
+                            </span>
+                          )}
                       </div>
 
                       <button
                         className="remove-btn"
                         onClick={() =>
-                          removeFromCart(item.id)
+                          removeFromCart(item.cartKey)
                         }
                         aria-label={`Remove ${item.name}`}
                       >
@@ -430,7 +778,9 @@ function App() {
                       <div className="quantity-control">
                         <button
                           onClick={() =>
-                            decreaseQuantity(item.id)
+                            decreaseQuantity(
+                              item.cartKey
+                            )
                           }
                           aria-label="Decrease quantity"
                         >
@@ -441,7 +791,9 @@ function App() {
 
                         <button
                           onClick={() =>
-                            increaseQuantity(item.id)
+                            increaseQuantity(
+                              item.cartKey
+                            )
                           }
                           aria-label="Increase quantity"
                         >
@@ -451,7 +803,8 @@ function App() {
 
                       <strong>
                         {money(
-                          item.price * item.quantity
+                          item.price *
+                            item.quantity
                         )}
                       </strong>
                     </div>
@@ -463,7 +816,10 @@ function App() {
             <div className="cart-footer">
               <div className="cart-total">
                 <span>SUBTOTAL</span>
-                <strong>{money(cartTotal)}</strong>
+
+                <strong>
+                  {money(cartTotal)}
+                </strong>
               </div>
 
               <p className="cart-note">
@@ -484,7 +840,9 @@ function App() {
 
               <button
                 className="continue-btn"
-                onClick={() => setCartOpen(false)}
+                onClick={() =>
+                  setCartOpen(false)
+                }
               >
                 CONTINUE SHOPPING
               </button>
@@ -555,7 +913,10 @@ function App() {
           </div>
         </section>
 
-        <section className="shop-section" id="shop">
+        <section
+          className="shop-section"
+          id="shop"
+        >
           <div className="section-head">
             <div>
               <span className="section-label">
@@ -607,57 +968,72 @@ function App() {
           </div>
 
           <div className="product-grid">
-            {filteredProducts.map((product, index) => (
-              <article
-                className={`product-card ${
-                  index === 0 || index === 5
-                    ? "product-card-large"
-                    : ""
-                }`}
-                key={product.id}
-              >
-                <div className="product-image-wrap">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="product-image"
-                  />
+            {filteredProducts.map(
+              (product, index) => (
+                <article
+                  className={`product-card ${
+                    index === 0 || index === 5
+                      ? "product-card-large"
+                      : ""
+                  }`}
+                  key={product.id}
+                >
+                  <div className="product-image-wrap">
+                    <img
+                      src={product.image}
+                      alt={product.name}
+                      className="product-image"
+                    />
 
-                  {product.tag && (
-                    <span className="product-tag">
-                      {product.tag}
-                    </span>
-                  )}
+                    {product.tag && (
+                      <span className="product-tag">
+                        {product.tag}
+                      </span>
+                    )}
 
-                  <button
-                    className="quick-add"
-                    onClick={() => addToCart(product)}
-                  >
-                    <span>ADD TO BAG</span>
-                    <ArrowRight size={15} />
-                  </button>
-                </div>
+                    <button
+                      className="quick-add"
+                      onClick={() =>
+                        product.hasOptions
+                          ? openProductOptions(
+                              product
+                            )
+                          : addToCart(product)
+                      }
+                    >
+                      <span>
+                        {product.hasOptions
+                          ? "SELECT OPTIONS"
+                          : "ADD TO BAG"}
+                      </span>
 
-                <div className="product-info">
-                  <div>
-                    <h3>{product.name}</h3>
-
-                    <span>
-                      {product.tag || "WEIRD CULTURE"}
-                    </span>
+                      <ArrowRight size={15} />
+                    </button>
                   </div>
 
-                  <strong>
-                    {money(product.price)}
-                  </strong>
-                </div>
-              </article>
-            ))}
+                  <div className="product-info">
+                    <div>
+                      <h3>{product.name}</h3>
+
+                      <span>
+                        {product.tag ||
+                          "WEIRD CULTURE"}
+                      </span>
+                    </div>
+
+                    <strong>
+                      {money(product.price)}
+                    </strong>
+                  </div>
+                </article>
+              )
+            )}
           </div>
 
           {filteredProducts.length === 0 && (
             <div className="empty-state">
               <h3>NOTHING FOUND.</h3>
+
               <p>TRY ANOTHER SEARCH.</p>
 
               <button
@@ -672,7 +1048,10 @@ function App() {
           )}
         </section>
 
-        <section className="statement" id="new-drop">
+        <section
+          className="statement"
+          id="new-drop"
+        >
           <div className="statement-no">
             02 / NEW DROP
           </div>
@@ -697,8 +1076,13 @@ function App() {
             </p>
 
             <div className="new-drop-pills">
-              <span>01 / HEAVY PRINTED LS</span>
-              <span>02 / REAL TREE CARGO</span>
+              <span>
+                01 / HEAVY PRINTED LS
+              </span>
+
+              <span>
+                02 / REAL TREE CARGO
+              </span>
             </div>
 
             <button
@@ -745,9 +1129,12 @@ function App() {
 
               <div className="collection-overlay">
                 <span>01</span>
+
                 <h3>GRAPHIC TEES</h3>
 
-                <button onClick={scrollToProducts}>
+                <button
+                  onClick={scrollToProducts}
+                >
                   EXPLORE
                   <ArrowRight size={15} />
                 </button>
@@ -762,11 +1149,13 @@ function App() {
 
               <div className="collection-overlay">
                 <span>02</span>
+
                 <h3>BAGGY PANTS</h3>
 
                 <button
                   onClick={() => {
                     setActiveCategory("PANTS");
+
                     document
                       .getElementById("shop")
                       ?.scrollIntoView({
@@ -788,11 +1177,13 @@ function App() {
 
               <div className="collection-overlay">
                 <span>03</span>
+
                 <h3>JERSEYS</h3>
 
                 <button
                   onClick={() => {
                     setActiveCategory("JERSEYS");
+
                     document
                       .getElementById("shop")
                       ?.scrollIntoView({
@@ -867,7 +1258,10 @@ function App() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              alert("You're in the WEIRD GANG.");
+
+              alert(
+                "You're in the WEIRD GANG."
+              );
             }}
           >
             <input
@@ -902,7 +1296,10 @@ function App() {
           <div className="footer-links">
             <div>
               <span>SHOP</span>
-              <a href="#shop">ALL PRODUCTS</a>
+
+              <a href="#shop">
+                ALL PRODUCTS
+              </a>
 
               <button onClick={scrollToNewDrop}>
                 NEW DROP
@@ -915,6 +1312,7 @@ function App() {
 
             <div>
               <span>INFO</span>
+
               <a href="#">ABOUT US</a>
               <a href="#">SHIPPING</a>
               <a href="#">CONTACT</a>
@@ -922,7 +1320,9 @@ function App() {
 
             <div>
               <span>SOCIAL</span>
+
               <a href="#">INSTAGRAM</a>
+
               <a href="#weird-gang">
                 WEIRD GANG
               </a>
@@ -940,7 +1340,9 @@ function App() {
   );
 }
 
-createRoot(document.getElementById("root")).render(
+createRoot(
+  document.getElementById("root")
+).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
