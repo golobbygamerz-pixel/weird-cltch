@@ -134,13 +134,17 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [cart, setCart] = useState([]);
-  const [activeCategory, setActiveCategory] = useState("ALL");
+  const [activeCategory, setActiveCategory] =
+    useState("ALL");
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  const [productModal, setProductModal] = useState(null);
-  const [selectedVariant, setSelectedVariant] = useState(0);
-  const [selectedSize, setSelectedSize] = useState("");
+  const [productModal, setProductModal] =
+    useState(null);
+  const [selectedVariant, setSelectedVariant] =
+    useState(0);
+  const [selectedSize, setSelectedSize] =
+    useState("");
   const [selectedQuantity, setSelectedQuantity] =
     useState(1);
 
@@ -178,7 +182,9 @@ function App() {
 
       if (!matchesSearch) return false;
 
-      if (activeCategory === "ALL") return true;
+      if (activeCategory === "ALL") {
+        return true;
+      }
 
       if (activeCategory === "NEW DROP") {
         return product.tag === "NEW DROP";
@@ -214,7 +220,9 @@ function App() {
   const handleCarouselScroll = (event) => {
     const container = event.currentTarget;
 
-    if (!productModal?.variants?.length) return;
+    if (!productModal?.variants?.length) {
+      return;
+    }
 
     const slides =
       container.querySelectorAll(
@@ -408,7 +416,9 @@ function App() {
   return (
     <div className="site">
       <div className="top-strip">
-        <p>FREE SHIPPING ON ORDERS ABOVE ₹1999</p>
+        <p>
+          FREE SHIPPING ON ORDERS ABOVE ₹1999
+        </p>
 
         <p className="top-strip-right">
           WEIRD GANG WORLDWIDE
@@ -548,7 +558,7 @@ function App() {
         </div>
       )}
 
-      {/* PRODUCT INFO MODAL */}
+      {/* PRODUCT DETAIL */}
 
       {productModal && (
         <div
@@ -569,25 +579,11 @@ function App() {
               <X size={21} />
             </button>
 
-            {/* PRODUCT IMAGE / DESIGN CAROUSEL */}
-
             {modalVariants.length > 0 ? (
               <div
                 ref={carouselRef}
                 className="product-carousel"
                 onScroll={handleCarouselScroll}
-                style={{
-                  display: "flex",
-                  overflowX: "auto",
-                  scrollSnapType:
-                    "x mandatory",
-                  WebkitOverflowScrolling:
-                    "touch",
-                  scrollbarWidth: "none",
-                  gap: "12px",
-                  padding: "0",
-                  scrollBehavior: "smooth"
-                }}
               >
                 {modalVariants.map(
                   (variant, index) => (
@@ -598,14 +594,6 @@ function App() {
                           ? "active"
                           : ""
                       }`}
-                      style={{
-                        minWidth: "100%",
-                        flex: "0 0 100%",
-                        scrollSnapAlign:
-                          "center",
-                        position:
-                          "relative"
-                      }}
                       onClick={() =>
                         selectCarouselVariant(
                           index
@@ -643,49 +631,24 @@ function App() {
               </div>
             )}
 
-            {/* CAROUSEL INDICATORS */}
-
             {modalVariants.length > 1 && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent:
-                    "center",
-                  alignItems: "center",
-                  gap: "6px",
-                  marginTop: "10px"
-                }}
-              >
+              <div className="product-carousel-dots">
                 {modalVariants.map(
                   (variant, index) => (
                     <button
                       key={variant.name}
                       type="button"
+                      className={`product-carousel-dot ${
+                        selectedVariant === index
+                          ? "active"
+                          : ""
+                      }`}
                       aria-label={`Select ${variant.name}`}
                       onClick={() =>
                         selectCarouselVariant(
                           index
                         )
                       }
-                      style={{
-                        width:
-                          selectedVariant ===
-                          index
-                            ? "22px"
-                            : "6px",
-                        height: "6px",
-                        border: "0",
-                        borderRadius: "999px",
-                        padding: "0",
-                        cursor: "pointer",
-                        background:
-                          selectedVariant ===
-                          index
-                            ? "#D71920"
-                            : "#555",
-                        transition:
-                          "all .2s ease"
-                      }}
                     />
                   )
                 )}
@@ -703,44 +666,16 @@ function App() {
                 {money(productModal.price)}
               </strong>
 
-              {/* SELECTED DESIGN */}
-
               {modalVariants.length > 0 && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent:
-                      "space-between",
-                    alignItems: "center",
-                    marginTop: "18px",
-                    marginBottom: "12px"
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "11px",
-                      letterSpacing:
-                        "0.12em",
-                      color: "#8A8A8A"
-                    }}
-                  >
-                    DESIGN
-                  </span>
+                <div className="selected-design">
+                  <span>DESIGN</span>
 
-                  <strong
-                    style={{
-                      fontSize: "12px",
-                      letterSpacing:
-                        "0.08em"
-                    }}
-                  >
-                    {selectedVariantData
-                      ?.name || ""}
+                  <strong>
+                    {selectedVariantData?.name ||
+                      ""}
                   </strong>
                 </div>
               )}
-
-              {/* SIZE */}
 
               <div className="option-section">
                 <div className="option-title">
@@ -762,9 +697,7 @@ function App() {
                           : ""
                       }
                       onClick={() =>
-                        setSelectedSize(
-                          size
-                        )
+                        setSelectedSize(size)
                       }
                     >
                       {size}
@@ -772,8 +705,6 @@ function App() {
                   ))}
                 </div>
               </div>
-
-              {/* QUANTITY + ADD TO CART */}
 
               <div className="modal-bottom">
                 <div className="modal-quantity">
@@ -787,6 +718,7 @@ function App() {
                           )
                       )
                     }
+                    aria-label="Decrease quantity"
                   >
                     <Minus size={14} />
                   </button>
@@ -802,6 +734,7 @@ function App() {
                           value + 1
                       )
                     }
+                    aria-label="Increase quantity"
                   >
                     <Plus size={14} />
                   </button>
@@ -903,15 +836,11 @@ function App() {
                   <div className="cart-item-info">
                     <div className="cart-item-top">
                       <div>
-                        <h3>
-                          {item.name}
-                        </h3>
+                        <h3>{item.name}</h3>
 
                         {item.variantName && (
                           <span>
-                            {
-                              item.variantName
-                            }
+                            {item.variantName}
                             {item.size
                               ? ` · SIZE ${item.size}`
                               : ""}
@@ -921,8 +850,7 @@ function App() {
                         {!item.variantName &&
                           item.size && (
                             <span>
-                              SIZE{" "}
-                              {item.size}
+                              SIZE {item.size}
                             </span>
                           )}
 
@@ -1062,13 +990,12 @@ function App() {
 
               <button
                 className="primary-btn"
-                onClick={
-                  scrollToProducts
-                }
+                onClick={scrollToProducts}
               >
                 <span>
                   SHOP THE CULTURE
                 </span>
+
                 <ArrowRight size={17} />
               </button>
             </div>
@@ -1120,44 +1047,36 @@ function App() {
           </div>
 
           <div className="category-bar">
-            {categories.map(
-              (category) => (
-                <button
-                  key={category}
-                  className={
-                    activeCategory ===
-                    category
-                      ? "active"
-                      : ""
-                  }
-                  onClick={() =>
-                    setActiveCategory(
-                      category
-                    )
-                  }
-                >
-                  {category}
+            {categories.map((category) => (
+              <button
+                key={category}
+                className={
+                  activeCategory === category
+                    ? "active"
+                    : ""
+                }
+                onClick={() =>
+                  setActiveCategory(category)
+                }
+              >
+                {category}
 
-                  {category ===
-                    "NEW DROP" && (
-                    <span className="category-dot" />
-                  )}
-                </button>
-              )
-            )}
+                {category === "NEW DROP" && (
+                  <span className="category-dot" />
+                )}
+              </button>
+            ))}
           </div>
 
           <div className="shop-status">
             <span>
-              {activeCategory ===
-              "NEW DROP"
+              {activeCategory === "NEW DROP"
                 ? "LATEST DROP"
                 : "ALL PIECES"}
             </span>
 
             <span>
-              {filteredProducts.length}{" "}
-              PRODUCTS
+              {filteredProducts.length} PRODUCTS
             </span>
           </div>
 
@@ -1166,8 +1085,7 @@ function App() {
               (product, index) => (
                 <article
                   className={`product-card ${
-                    index === 0 ||
-                    index === 5
+                    index === 0 || index === 5
                       ? "product-card-large"
                       : ""
                   }`}
@@ -1189,26 +1107,20 @@ function App() {
                     <button
                       className="quick-add"
                       onClick={() =>
-                        openProductOptions(
-                          product
-                        )
+                        openProductOptions(product)
                       }
                     >
                       <span>
                         VIEW PRODUCT
                       </span>
 
-                      <ArrowRight
-                        size={15}
-                      />
+                      <ArrowRight size={15} />
                     </button>
                   </div>
 
                   <div className="product-info">
                     <div>
-                      <h3>
-                        {product.name}
-                      </h3>
+                      <h3>{product.name}</h3>
 
                       <span>
                         {product.tag ||
@@ -1217,9 +1129,7 @@ function App() {
                     </div>
 
                     <strong>
-                      {money(
-                        product.price
-                      )}
+                      {money(product.price)}
                     </strong>
                   </div>
                 </article>
@@ -1227,12 +1137,9 @@ function App() {
             )}
           </div>
 
-          {filteredProducts.length ===
-            0 && (
+          {filteredProducts.length === 0 && (
             <div className="empty-state">
-              <h3>
-                NOTHING FOUND.
-              </h3>
+              <h3>NOTHING FOUND.</h3>
 
               <p>
                 TRY ANOTHER SEARCH.
@@ -1241,9 +1148,7 @@ function App() {
               <button
                 onClick={() => {
                   setSearch("");
-                  setActiveCategory(
-                    "ALL"
-                  );
+                  setActiveCategory("ALL");
                 }}
               >
                 RESET SHOP
@@ -1277,8 +1182,7 @@ function App() {
               THE LATEST PIECES FROM WEIRD
               CULTURE.
               <br />
-              HEAVY GRAPHICS. OVERSIZED
-              FITS.
+              HEAVY GRAPHICS. OVERSIZED FITS.
               <br />
               RAW ENERGY. NOTHING NORMAL.
             </p>
@@ -1295,13 +1199,9 @@ function App() {
 
             <button
               className="outline-btn"
-              onClick={
-                scrollToNewDrop
-              }
+              onClick={scrollToNewDrop}
             >
-              <span>
-                SHOP NEW DROP
-              </span>
+              <span>SHOP NEW DROP</span>
               <ArrowRight size={17} />
             </button>
           </div>
@@ -1331,84 +1231,61 @@ function App() {
               03 / COLLECTIONS
             </span>
 
-            <h2>
-              BUILT DIFFERENT.
-            </h2>
+            <h2>BUILT DIFFERENT.</h2>
           </div>
 
           <div className="collection-grid">
             <div className="collection-card collection-wide">
               <img
-                src={image(
-                  "IMG_0914.jpeg"
-                )}
+                src={image("IMG_0914.jpeg")}
                 alt="Tees collection"
               />
 
               <div className="collection-overlay">
                 <span>01</span>
 
-                <h3>
-                  GRAPHIC TEES
-                </h3>
+                <h3>GRAPHIC TEES</h3>
 
                 <button
-                  onClick={
-                    scrollToProducts
-                  }
+                  onClick={scrollToProducts}
                 >
                   EXPLORE
-                  <ArrowRight
-                    size={15}
-                  />
+                  <ArrowRight size={15} />
                 </button>
               </div>
             </div>
 
             <div className="collection-card">
               <img
-                src={image(
-                  "IMG_0915.jpeg"
-                )}
+                src={image("IMG_0915.jpeg")}
                 alt="Pants collection"
               />
 
               <div className="collection-overlay">
                 <span>02</span>
 
-                <h3>
-                  BAGGY PANTS
-                </h3>
+                <h3>BAGGY PANTS</h3>
 
                 <button
                   onClick={() => {
-                    setActiveCategory(
-                      "PANTS"
-                    );
+                    setActiveCategory("PANTS");
 
                     document
-                      .getElementById(
-                        "shop"
-                      )
+                      .getElementById("shop")
                       ?.scrollIntoView({
-                        behavior:
-                          "smooth"
+                        behavior: "smooth"
                       });
                   }}
                 >
                   EXPLORE
-                  <ArrowRight
-                    size={15}
-                  />
+                  <ArrowRight size={15} />
                 </button>
               </div>
             </div>
 
             <div className="collection-card">
               <img
-                src={image(
-                  "IMG_0916.jpeg"
-                )}
+                src={image("IMG_0916.jpeg")}
                 alt="Jersey collection"
               />
 
@@ -1419,24 +1296,17 @@ function App() {
 
                 <button
                   onClick={() => {
-                    setActiveCategory(
-                      "JERSEYS"
-                    );
+                    setActiveCategory("JERSEYS");
 
                     document
-                      .getElementById(
-                        "shop"
-                      )
+                      .getElementById("shop")
                       ?.scrollIntoView({
-                        behavior:
-                          "smooth"
+                        behavior: "smooth"
                       });
                   }}
                 >
                   EXPLORE
-                  <ArrowRight
-                    size={15}
-                  />
+                  <ArrowRight size={15} />
                 </button>
               </div>
             </div>
@@ -1457,9 +1327,7 @@ function App() {
             <h2>
               JOIN THE
               <br />
-              <span>
-                WEIRD GANG.
-              </span>
+              <span>WEIRD GANG.</span>
             </h2>
 
             <p>
@@ -1471,27 +1339,21 @@ function App() {
             </p>
 
             <button className="primary-btn">
-              <span>
-                @WEIRDCULTURE
-              </span>
+              <span>@WEIRDCULTURE</span>
               <ArrowRight size={18} />
             </button>
           </div>
 
           <div className="gang-image">
             <img
-              src={image(
-                "IMG_0911.jpeg"
-              )}
+              src={image("IMG_0911.jpeg")}
               alt="WEIRD GANG"
             />
 
             <div className="gang-stamp">
               <span>WEIRD</span>
               <strong>GANG</strong>
-              <span>
-                EST. 2026
-              </span>
+              <span>EST. 2026</span>
             </div>
           </div>
         </section>
@@ -1560,9 +1422,7 @@ function App() {
               </a>
 
               <button
-                onClick={
-                  scrollToNewDrop
-                }
+                onClick={scrollToNewDrop}
               >
                 NEW DROP
               </button>
@@ -1575,25 +1435,15 @@ function App() {
             <div>
               <span>INFO</span>
 
-              <a href="#">
-                ABOUT US
-              </a>
-
-              <a href="#">
-                SHIPPING
-              </a>
-
-              <a href="#">
-                CONTACT
-              </a>
+              <a href="#">ABOUT US</a>
+              <a href="#">SHIPPING</a>
+              <a href="#">CONTACT</a>
             </div>
 
             <div>
               <span>SOCIAL</span>
 
-              <a href="#">
-                INSTAGRAM
-              </a>
+              <a href="#">INSTAGRAM</a>
 
               <a href="#weird-gang">
                 WEIRD GANG
@@ -1603,14 +1453,8 @@ function App() {
         </div>
 
         <div className="footer-bottom">
-          <span>
-            © 2026 WEIRD CULTURE
-          </span>
-
-          <span>
-            MADE FOR THE WEIRD.
-          </span>
-
+          <span>© 2026 WEIRD CULTURE</span>
+          <span>MADE FOR THE WEIRD.</span>
           <span>INDIA</span>
         </div>
       </footer>
