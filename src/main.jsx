@@ -23,24 +23,50 @@ import {
 import { createClient } from "@supabase/supabase-js";
 import "./styles.css";
 
-const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL;
+/* =========================
+   SUPABASE CONFIG
+========================= */
 
-const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY;
+const cleanEnvValue = (value = "") =>
+  String(value)
+    .trim()
+    .replace(/^["'`]+|["'`]+$/g, "");
 
-const supabase =
-  SUPABASE_URL && SUPABASE_ANON_KEY
-    ? createClient(
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY
-      )
-    : null;
+const SUPABASE_URL = cleanEnvValue(
+  import.meta.env.VITE_SUPABASE_URL
+)
+  .replace(/\/rest\/v1\/?$/, "")
+  .replace(/\/+$/, "");
+
+const SUPABASE_ANON_KEY = cleanEnvValue(
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
+
+let supabase = null;
+
+if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+  try {
+    supabase = createClient(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY
+    );
+  } catch (error) {
+    console.error(
+      "Supabase initialization failed:",
+      error
+    );
+    supabase = null;
+  }
+}
 
 const image = (name) =>
   `${import.meta.env.BASE_URL}images/${name}`;
 
 const sizes = ["S", "M", "L", "XL", "XXL"];
+
+/* =========================
+   PRODUCTS
+========================= */
 
 const products = [
   {
@@ -210,31 +236,67 @@ function App() {
   const [ordersLoading, setOrdersLoading] =
     useState(false);
 
+  /* =========================
+     AUTH SESSION
+  ========================= */
+
   useEffect(() => {
     if (!supabase) {
       setAuthLoading(false);
       return;
     }
 
-    supabase.auth.getSession().then(
-      ({ data }) => {
-        setUser(data.session?.user || null);
-        setAuthLoading(false);
-      }
-    );
+    let mounted = true;
+
+    supabase.auth
+      .getSession()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error(
+            "Supabase session error:",
+            error
+          );
+        }
+
+        if (mounted) {
+          setUser(
+            data?.session?.user || null
+          );
+          setAuthLoading(false);
+        }
+      })
+      .catch((error) => {
+        console.error(
+          "Supabase session failed:",
+          error
+        );
+
+        if (mounted) {
+          setAuthLoading(false);
+        }
+      });
 
     const {
       data: listener
     } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        setUser(session?.user || null);
+        if (mounted) {
+          setUser(
+            session?.user || null
+          );
+        }
       }
     );
 
     return () => {
-      listener.subscription.unsubscribe();
+      mounted = false;
+      listener?.subscription?.unsubscribe();
     };
   }, []);
+
+  /* =========================
+     BODY LOCK
+  ========================= */
 
   useEffect(() => {
     document.body.style.overflow =
@@ -261,6 +323,10 @@ function App() {
     ordersOpen
   ]);
 
+  /* =========================
+     USER PROFILE
+  ========================= */
+
   useEffect(() => {
     if (user) {
       setCheckoutForm((current) => ({
@@ -272,48 +338,80 @@ function App() {
     }
   }, [user]);
 
+  /* =========================
+     CART
+  ========================= */
+
   const cartCount = cart.reduce(
-    (total, item) => total + item.quantity,
+    (total, item) =>
+      total + item.quantity,
     0
   );
 
   const cartTotal = cart.reduce(
     (total, item) =>
-      total + item.price * item.quantity,
+      total +
+      item.price * item.quantity,
     0
   );
 
   const shipping =
-    cartTotal >= 1999 || cartTotal === 0
+    cartTotal >= 1999 ||
+    cartTotal === 0
       ? 0
       : 99;
 
   const grandTotal =
     cartTotal + shipping;
 
+  /* =========================
+     PRODUCT FILTER
+  ========================= */
+
   const filteredProducts = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    const query =
+      search.trim().toLowerCase();
 
-    return products.filter((product) => {
-      const matchesSearch = product.name
-        .toLowerCase()
-        .includes(query);
+    return products.filter(
+      (product) => {
+        const matchesSearch =
+          product.name
+            .toLowerCase()
+            .includes(query);
 
-      if (!matchesSearch) return false;
+        if (!matchesSearch) {
+          return false;
+        }
 
-      if (activeCategory === "ALL") {
-        return true;
+        if (activeCategory === "ALL") {
+          return true;
+        }
+
+        if (
+          activeCategory ===
+          "NEW DROP"
+        ) {
+          return (
+            product.tag ===
+            "NEW DROP"
+          );
+        }
+
+        return (
+          product.category ===
+          activeCategory
+        );
       }
-
-      if (activeCategory === "NEW DROP") {
-        return product.tag === "NEW DROP";
-      }
-
-      return product.category === activeCategory;
-    });
+    );
   }, [activeCategory, search]);
 
-  const openProductOptions = (product) => {
+  /* =========================
+     PRODUCT MODAL
+  ========================= */
+
+  const openProductOptions = (
+    product
+  ) => {
     setProductModal(product);
     setSelectedVariant(0);
     setSelectedSize("");
@@ -336,10 +434,15 @@ function App() {
     setSelectedQuantity(1);
   };
 
-  const handleCarouselScroll = (event) => {
-    const container = event.currentTarget;
+  const handleCarouselScroll = (
+    event
+  ) => {
+    const container =
+      event.currentTarget;
 
-    if (!productModal?.variants?.length) {
+    if (
+      !productModal?.variants?.length
+    ) {
       return;
     }
 
@@ -348,7 +451,9 @@ function App() {
         ".product-carousel-slide"
       );
 
-    if (!slides.length) return;
+    if (!slides.length) {
+      return;
+    }
 
     const containerCenter =
       container.scrollLeft +
@@ -357,30 +462,45 @@ function App() {
     let closestIndex = 0;
     let closestDistance = Infinity;
 
-    slides.forEach((slide, index) => {
-      const slideCenter =
-        slide.offsetLeft +
-        slide.offsetWidth / 2;
+    slides.forEach(
+      (slide, index) => {
+        const slideCenter =
+          slide.offsetLeft +
+          slide.offsetWidth / 2;
 
-      const distance = Math.abs(
-        containerCenter - slideCenter
-      );
+        const distance =
+          Math.abs(
+            containerCenter -
+              slideCenter
+          );
 
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        closestIndex = index;
+        if (
+          distance <
+          closestDistance
+        ) {
+          closestDistance =
+            distance;
+          closestIndex = index;
+        }
       }
-    });
+    );
 
-    setSelectedVariant(closestIndex);
+    setSelectedVariant(
+      closestIndex
+    );
   };
 
-  const selectCarouselVariant = (index) => {
+  const selectCarouselVariant = (
+    index
+  ) => {
     setSelectedVariant(index);
 
-    const container = carouselRef.current;
+    const container =
+      carouselRef.current;
 
-    if (!container) return;
+    if (!container) {
+      return;
+    }
 
     const slide =
       container.querySelectorAll(
@@ -393,6 +513,10 @@ function App() {
       inline: "center"
     });
   };
+
+  /* =========================
+     CART FUNCTIONS
+  ========================= */
 
   const addToCart = (
     product,
@@ -409,47 +533,58 @@ function App() {
       size || ""
     ].join("-");
 
-    setCart((currentCart) => {
-      const existing = currentCart.find(
-        (item) =>
-          item.cartKey === cartKey
-      );
+    setCart(
+      (currentCart) => {
+        const existing =
+          currentCart.find(
+            (item) =>
+              item.cartKey ===
+              cartKey
+          );
 
-      if (existing) {
-        return currentCart.map((item) =>
-          item.cartKey === cartKey
-            ? {
-                ...item,
-                quantity:
-                  item.quantity + quantity
-              }
-            : item
-        );
-      }
-
-      return [
-        ...currentCart,
-        {
-          ...product,
-          cartKey,
-          image:
-            variant?.image ||
-            product.image,
-          variantName,
-          size,
-          quantity
+        if (existing) {
+          return currentCart.map(
+            (item) =>
+              item.cartKey ===
+              cartKey
+                ? {
+                    ...item,
+                    quantity:
+                      item.quantity +
+                      quantity
+                  }
+                : item
+          );
         }
-      ];
-    });
+
+        return [
+          ...currentCart,
+          {
+            ...product,
+            cartKey,
+            image:
+              variant?.image ||
+              product.image,
+            variantName,
+            size,
+            quantity
+          }
+        ];
+      }
+    );
 
     setCartOpen(true);
   };
 
   const handleProductAdd = () => {
-    if (!productModal) return;
+    if (!productModal) {
+      return;
+    }
 
     if (!selectedSize) {
-      alert("PLEASE SELECT A SIZE.");
+      alert(
+        "PLEASE SELECT A SIZE."
+      );
       return;
     }
 
@@ -468,46 +603,63 @@ function App() {
     closeProductOptions();
   };
 
-  const increaseQuantity = (id) => {
-    setCart((currentCart) =>
-      currentCart.map((item) =>
-        item.cartKey === id
-          ? {
-              ...item,
-              quantity:
-                item.quantity + 1
-            }
-          : item
-      )
-    );
-  };
-
-  const decreaseQuantity = (id) => {
-    setCart((currentCart) =>
-      currentCart
-        .map((item) =>
-          item.cartKey === id
-            ? {
-                ...item,
-                quantity:
-                  item.quantity - 1
-              }
-            : item
-        )
-        .filter(
-          (item) => item.quantity > 0
+  const increaseQuantity = (
+    id
+  ) => {
+    setCart(
+      (currentCart) =>
+        currentCart.map(
+          (item) =>
+            item.cartKey === id
+              ? {
+                  ...item,
+                  quantity:
+                    item.quantity +
+                    1
+                }
+              : item
         )
     );
   };
 
-  const removeFromCart = (id) => {
-    setCart((currentCart) =>
-      currentCart.filter(
-        (item) =>
-          item.cartKey !== id
-      )
+  const decreaseQuantity = (
+    id
+  ) => {
+    setCart(
+      (currentCart) =>
+        currentCart
+          .map((item) =>
+            item.cartKey === id
+              ? {
+                  ...item,
+                  quantity:
+                    item.quantity -
+                    1
+                }
+              : item
+          )
+          .filter(
+            (item) =>
+              item.quantity > 0
+          )
     );
   };
+
+  const removeFromCart = (
+    id
+  ) => {
+    setCart(
+      (currentCart) =>
+        currentCart.filter(
+          (item) =>
+            item.cartKey !== id
+        )
+    );
+  };
+
+  /* =========================
+     NAVIGATION
+  ========================= */
 
   const scrollToProducts = () => {
     setActiveCategory("ALL");
@@ -522,7 +674,9 @@ function App() {
   };
 
   const scrollToNewDrop = () => {
-    setActiveCategory("NEW DROP");
+    setActiveCategory(
+      "NEW DROP"
+    );
 
     setTimeout(() => {
       document
@@ -536,7 +690,13 @@ function App() {
   const closeMenu = () =>
     setMenuOpen(false);
 
-  const openAuth = (mode = "login") => {
+  /* =========================
+     AUTH UI
+  ========================= */
+
+  const openAuth = (
+    mode = "login"
+  ) => {
     setAuthMode(mode);
     setAuthOpen(true);
     setAccountOpen(false);
@@ -544,6 +704,7 @@ function App() {
 
   const closeAuth = () => {
     setAuthOpen(false);
+
     setAuthForm({
       email: "",
       password: "",
@@ -551,44 +712,64 @@ function App() {
     });
   };
 
-  const handleAuth = async (event) => {
+  const handleAuth = async (
+    event
+  ) => {
     event.preventDefault();
 
     if (!supabase) {
       alert(
-        "SUPABASE IS NOT CONFIGURED. ADD YOUR .ENV VALUES FIRST."
+        "SUPABASE CONFIGURATION IS MISSING OR INVALID. CHECK YOUR GITHUB ACTIONS SECRETS."
       );
       return;
     }
 
     try {
-      if (authMode === "signup") {
+      if (
+        authMode ===
+        "signup"
+      ) {
         const {
           data,
           error
         } =
-          await supabase.auth.signUp({
-            email: authForm.email,
-            password:
-              authForm.password,
-            options: {
-              data: {
-                full_name:
-                  authForm.fullName
+          await supabase.auth.signUp(
+            {
+              email:
+                authForm.email.trim(),
+              password:
+                authForm.password,
+              options: {
+                data: {
+                  full_name:
+                    authForm.fullName.trim()
+                }
               }
             }
-          });
+          );
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
 
-        if (data.user) {
-          await supabase
+        if (data?.user) {
+          const {
+            error:
+              profileError
+          } = await supabase
             .from("profiles")
             .upsert({
               id: data.user.id,
               full_name:
-                authForm.fullName
+                authForm.fullName.trim()
             });
+
+          if (profileError) {
+            console.error(
+              "Profile creation error:",
+              profileError
+            );
+          }
         }
 
         alert(
@@ -604,72 +785,119 @@ function App() {
       } =
         await supabase.auth.signInWithPassword(
           {
-            email: authForm.email,
+            email:
+              authForm.email.trim(),
             password:
               authForm.password
           }
         );
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       closeAuth();
     } catch (error) {
+      console.error(
+        "Authentication error:",
+        error
+      );
+
       alert(
-        error.message ||
+        error?.message ||
           "AUTHENTICATION FAILED."
       );
     }
   };
 
   const logout = async () => {
-    if (!supabase) return;
+    if (!supabase) {
+      return;
+    }
 
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error(
+        "Logout error:",
+        error
+      );
+    }
 
     setUser(null);
     setAccountOpen(false);
     setOrders([]);
   };
 
+  /* =========================
+     PROFILE
+  ========================= */
+
   const loadProfile = async () => {
-    if (!supabase || !user) return;
+    if (!supabase || !user) {
+      return;
+    }
 
-    const {
-      data
-    } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle();
+    try {
+      const {
+        data,
+        error
+      } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
 
-    if (data) {
-      setCheckoutForm((current) => ({
-        ...current,
-        fullName:
-          data.full_name ||
-          current.fullName,
-        phone:
-          data.phone ||
-          current.phone,
-        address:
-          data.address ||
-          current.address,
-        city:
-          data.city ||
-          current.city,
-        state:
-          data.state ||
-          current.state,
-        pincode:
-          data.pincode ||
-          current.pincode
-      }));
+      if (error) {
+        console.error(
+          "Profile load error:",
+          error
+        );
+        return;
+      }
+
+      if (data) {
+        setCheckoutForm(
+          (current) => ({
+            ...current,
+            fullName:
+              data.full_name ||
+              current.fullName,
+            phone:
+              data.phone ||
+              current.phone,
+            address:
+              data.address ||
+              current.address,
+            city:
+              data.city ||
+              current.city,
+            state:
+              data.state ||
+              current.state,
+            pincode:
+              data.pincode ||
+              current.pincode
+          })
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Profile request failed:",
+        error
+      );
     }
   };
 
+  /* =========================
+     CHECKOUT
+  ========================= */
+
   const openCheckout = () => {
     if (!cart.length) {
-      alert("YOUR BAG IS EMPTY.");
+      alert(
+        "YOUR BAG IS EMPTY."
+      );
       return;
     }
 
@@ -684,7 +912,9 @@ function App() {
     loadProfile();
   };
 
-  const placeOrder = async (event) => {
+  const placeOrder = async (
+    event
+  ) => {
     event.preventDefault();
 
     if (!supabase || !user) {
@@ -701,10 +931,14 @@ function App() {
       "pincode"
     ];
 
-    const missing = requiredFields.some(
-      (field) =>
-        !checkoutForm[field].trim()
-    );
+    const missing =
+      requiredFields.some(
+        (field) =>
+          !String(
+            checkoutForm[field] ||
+              ""
+          ).trim()
+      );
 
     if (missing) {
       alert(
@@ -721,35 +955,37 @@ function App() {
         .upsert({
           id: user.id,
           full_name:
-            checkoutForm.fullName,
+            checkoutForm.fullName.trim(),
           phone:
-            checkoutForm.phone,
+            checkoutForm.phone.trim(),
           address:
-            checkoutForm.address,
+            checkoutForm.address.trim(),
           city:
-            checkoutForm.city,
+            checkoutForm.city.trim(),
           state:
-            checkoutForm.state,
+            checkoutForm.state.trim(),
           pincode:
-            checkoutForm.pincode
+            checkoutForm.pincode.trim()
         });
 
       if (profileError) {
         throw profileError;
       }
 
-      const orderItems = cart.map(
-        (item) => ({
+      const orderItems =
+        cart.map((item) => ({
           product_id: item.id,
           name: item.name,
           variant:
-            item.variantName || null,
-          size: item.size || null,
+            item.variantName ||
+            null,
+          size:
+            item.size || null,
           price: item.price,
-          quantity: item.quantity,
+          quantity:
+            item.quantity,
           image: item.image
-        })
-      );
+        }));
 
       const {
         error: orderError
@@ -758,20 +994,20 @@ function App() {
         .insert({
           user_id: user.id,
           customer_name:
-            checkoutForm.fullName,
+            checkoutForm.fullName.trim(),
           phone:
-            checkoutForm.phone,
+            checkoutForm.phone.trim(),
           email:
-            checkoutForm.email ||
+            checkoutForm.email.trim() ||
             user.email,
           address:
-            checkoutForm.address,
+            checkoutForm.address.trim(),
           city:
-            checkoutForm.city,
+            checkoutForm.city.trim(),
           state:
-            checkoutForm.state,
+            checkoutForm.state.trim(),
           pincode:
-            checkoutForm.pincode,
+            checkoutForm.pincode.trim(),
           items: orderItems,
           subtotal: cartTotal,
           shipping,
@@ -794,40 +1030,62 @@ function App() {
 
       loadOrders();
     } catch (error) {
+      console.error(
+        "Order error:",
+        error
+      );
+
       alert(
-        error.message ||
+        error?.message ||
           "COULD NOT PLACE ORDER."
       );
     }
   };
 
+  /* =========================
+     ORDERS
+  ========================= */
+
   const loadOrders = async () => {
-    if (!supabase || !user) return;
-
-    setOrdersLoading(true);
-
-    const {
-      data,
-      error
-    } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", {
-        ascending: false
-      });
-
-    setOrdersLoading(false);
-
-    if (error) {
-      alert(
-        error.message ||
-          "COULD NOT LOAD ORDERS."
-      );
+    if (!supabase || !user) {
       return;
     }
 
-    setOrders(data || []);
+    setOrdersLoading(true);
+
+    try {
+      const {
+        data,
+        error
+      } = await supabase
+        .from("orders")
+        .select("*")
+        .eq(
+          "user_id",
+          user.id
+        )
+        .order("created_at", {
+          ascending: false
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      setOrders(data || []);
+    } catch (error) {
+      console.error(
+        "Orders error:",
+        error
+      );
+
+      alert(
+        error?.message ||
+          "COULD NOT LOAD ORDERS."
+      );
+    } finally {
+      setOrdersLoading(false);
+    }
   };
 
   const openOrders = async () => {
@@ -844,14 +1102,16 @@ function App() {
     productModal?.variants || [];
 
   const selectedVariantData =
-    modalVariants[selectedVariant] ||
-    null;
+    modalVariants[
+      selectedVariant
+    ] || null;
 
   return (
     <div className="site">
       <div className="top-strip">
         <p>
-          FREE SHIPPING ON ORDERS ABOVE ₹1999
+          FREE SHIPPING ON ORDERS ABOVE
+          ₹1999
         </p>
 
         <p className="top-strip-right">
@@ -876,10 +1136,14 @@ function App() {
         </a>
 
         <nav className="desktop-nav">
-          <a href="#shop">SHOP</a>
+          <a href="#shop">
+            SHOP
+          </a>
 
           <button
-            onClick={scrollToNewDrop}
+            onClick={
+              scrollToNewDrop
+            }
           >
             NEW DROP
           </button>
@@ -910,7 +1174,9 @@ function App() {
             className="icon-btn account-btn"
             onClick={() => {
               if (user) {
-                setAccountOpen(true);
+                setAccountOpen(
+                  true
+                );
               } else {
                 openAuth("login");
               }
@@ -932,10 +1198,14 @@ function App() {
             aria-label="Open cart"
           >
             <ShoppingBag size={19} />
-            <span>{cartCount}</span>
+            <span>
+              {cartCount}
+            </span>
           </button>
         </div>
       </header>
+
+      {/* SEARCH */}
 
       {searchOpen && (
         <div className="search-panel">
@@ -945,7 +1215,9 @@ function App() {
             autoFocus
             value={search}
             onChange={(e) =>
-              setSearch(e.target.value)
+              setSearch(
+                e.target.value
+              )
             }
             placeholder="SEARCH THE CULTURE..."
           />
@@ -953,7 +1225,9 @@ function App() {
           <button
             className="close-search"
             onClick={() => {
-              setSearchOpen(false);
+              setSearchOpen(
+                false
+              );
               setSearch("");
             }}
           >
@@ -961,6 +1235,8 @@ function App() {
           </button>
         </div>
       )}
+
+      {/* MOBILE MENU */}
 
       {menuOpen && (
         <div className="mobile-menu">
@@ -1009,8 +1285,11 @@ function App() {
             <button
               onClick={() => {
                 closeMenu();
+
                 if (user) {
-                  setAccountOpen(true);
+                  setAccountOpen(
+                    true
+                  );
                 } else {
                   openAuth("login");
                 }
@@ -1021,8 +1300,13 @@ function App() {
           </nav>
 
           <div className="mobile-menu-bottom">
-            <span>EST. 2026</span>
-            <span>WEIRD CULTURE</span>
+            <span>
+              EST. 2026
+            </span>
+
+            <span>
+              WEIRD CULTURE
+            </span>
           </div>
         </div>
       )}
@@ -1032,7 +1316,9 @@ function App() {
       {productModal && (
         <div
           className="product-modal-backdrop"
-          onClick={closeProductOptions}
+          onClick={
+            closeProductOptions
+          }
         >
           <div
             className="product-modal"
@@ -1042,13 +1328,16 @@ function App() {
           >
             <button
               className="product-modal-close"
-              onClick={closeProductOptions}
+              onClick={
+                closeProductOptions
+              }
               aria-label="Close product"
             >
               <X size={21} />
             </button>
 
-            {modalVariants.length > 0 ? (
+            {modalVariants.length >
+            0 ? (
               <div
                 ref={carouselRef}
                 className="product-carousel"
@@ -1057,9 +1346,14 @@ function App() {
                 }
               >
                 {modalVariants.map(
-                  (variant, index) => (
+                  (
+                    variant,
+                    index
+                  ) => (
                     <div
-                      key={variant.name}
+                      key={
+                        variant.name
+                      }
                       className={`product-carousel-slide ${
                         selectedVariant ===
                         index
@@ -1074,13 +1368,17 @@ function App() {
                     >
                       <div className="product-modal-image">
                         <img
-                          src={variant.image}
+                          src={
+                            variant.image
+                          }
                           alt={`${productModal.name} ${variant.name}`}
                         />
 
                         {productModal.tag && (
                           <span className="product-modal-tag">
-                            {productModal.tag}
+                            {
+                              productModal.tag
+                            }
                           </span>
                         )}
                       </div>
@@ -1091,24 +1389,36 @@ function App() {
             ) : (
               <div className="product-modal-image">
                 <img
-                  src={productModal.image}
-                  alt={productModal.name}
+                  src={
+                    productModal.image
+                  }
+                  alt={
+                    productModal.name
+                  }
                 />
 
                 {productModal.tag && (
                   <span className="product-modal-tag">
-                    {productModal.tag}
+                    {
+                      productModal.tag
+                    }
                   </span>
                 )}
               </div>
             )}
 
-            {modalVariants.length > 1 && (
+            {modalVariants.length >
+              1 && (
               <div className="product-carousel-dots">
                 {modalVariants.map(
-                  (variant, index) => (
+                  (
+                    variant,
+                    index
+                  ) => (
                     <button
-                      key={variant.name}
+                      key={
+                        variant.name
+                      }
                       type="button"
                       className={`product-carousel-dot ${
                         selectedVariant ===
@@ -1130,10 +1440,14 @@ function App() {
 
             <div className="product-modal-info">
               <span className="product-modal-category">
-                {productModal.category}
+                {
+                  productModal.category
+                }
               </span>
 
-              <h2>{productModal.name}</h2>
+              <h2>
+                {productModal.name}
+              </h2>
 
               <strong className="product-modal-price">
                 {money(
@@ -1141,9 +1455,12 @@ function App() {
                 )}
               </strong>
 
-              {modalVariants.length > 0 && (
+              {modalVariants.length >
+                0 && (
                 <div className="selected-design">
-                  <span>DESIGN</span>
+                  <span>
+                    DESIGN
+                  </span>
 
                   <strong>
                     {selectedVariantData?.name ||
@@ -1154,7 +1471,9 @@ function App() {
 
               <div className="option-section">
                 <div className="option-title">
-                  <span>SIZE</span>
+                  <span>
+                    SIZE
+                  </span>
 
                   <strong>
                     {selectedSize ||
@@ -1163,22 +1482,26 @@ function App() {
                 </div>
 
                 <div className="size-options">
-                  {sizes.map((size) => (
-                    <button
-                      key={size}
-                      className={
-                        selectedSize ===
-                        size
-                          ? "selected"
-                          : ""
-                      }
-                      onClick={() =>
-                        setSelectedSize(size)
-                      }
-                    >
-                      {size}
-                    </button>
-                  ))}
+                  {sizes.map(
+                    (size) => (
+                      <button
+                        key={size}
+                        className={
+                          selectedSize ===
+                          size
+                            ? "selected"
+                            : ""
+                        }
+                        onClick={() =>
+                          setSelectedSize(
+                            size
+                          )
+                        }
+                      >
+                        {size}
+                      </button>
+                    )
+                  )}
                 </div>
               </div>
 
@@ -1190,7 +1513,8 @@ function App() {
                         (value) =>
                           Math.max(
                             1,
-                            value - 1
+                            value -
+                              1
                           )
                       )
                     }
@@ -1200,7 +1524,9 @@ function App() {
                   </button>
 
                   <span>
-                    {selectedQuantity}
+                    {
+                      selectedQuantity
+                    }
                   </span>
 
                   <button
@@ -1222,7 +1548,10 @@ function App() {
                     handleProductAdd
                   }
                 >
-                  <span>ADD TO CART</span>
+                  <span>
+                    ADD TO CART
+                  </span>
+
                   <ArrowRight size={17} />
                 </button>
               </div>
@@ -1231,7 +1560,7 @@ function App() {
         </div>
       )}
 
-      {/* CART */}
+      {/* CART BACKDROP */}
 
       {cartOpen && (
         <div
@@ -1241,6 +1570,8 @@ function App() {
           }
         />
       )}
+
+      {/* CART */}
 
       <aside
         className={`cart-drawer ${
@@ -1255,7 +1586,9 @@ function App() {
 
             <h2>
               CART
-              <span>{cartCount}</span>
+              <span>
+                {cartCount}
+              </span>
             </h2>
           </div>
 
@@ -1276,10 +1609,13 @@ function App() {
               strokeWidth={1.2}
             />
 
-            <h3>YOUR BAG IS EMPTY.</h3>
+            <h3>
+              YOUR BAG IS EMPTY.
+            </h3>
 
             <p>
-              NOTHING WEIRD IN HERE YET.
+              NOTHING WEIRD IN HERE
+              YET.
             </p>
 
             <button
@@ -1299,12 +1635,18 @@ function App() {
               {cart.map((item) => (
                 <div
                   className="cart-item"
-                  key={item.cartKey}
+                  key={
+                    item.cartKey
+                  }
                 >
                   <div className="cart-item-image">
                     <img
-                      src={item.image}
-                      alt={item.name}
+                      src={
+                        item.image
+                      }
+                      alt={
+                        item.name
+                      }
                     />
                   </div>
 
@@ -1312,12 +1654,16 @@ function App() {
                     <div className="cart-item-top">
                       <div>
                         <h3>
-                          {item.name}
+                          {
+                            item.name
+                          }
                         </h3>
 
                         {item.variantName && (
                           <span>
-                            {item.variantName}
+                            {
+                              item.variantName
+                            }
                             {item.size
                               ? ` · SIZE ${item.size}`
                               : ""}
@@ -1328,7 +1674,9 @@ function App() {
                           item.size && (
                             <span>
                               SIZE{" "}
-                              {item.size}
+                              {
+                                item.size
+                              }
                             </span>
                           )}
 
@@ -1336,7 +1684,9 @@ function App() {
                           !item.size &&
                           item.tag && (
                             <span>
-                              {item.tag}
+                              {
+                                item.tag
+                              }
                             </span>
                           )}
                       </div>
@@ -1370,7 +1720,9 @@ function App() {
                         </button>
 
                         <span>
-                          {item.quantity}
+                          {
+                            item.quantity
+                          }
                         </span>
 
                         <button
@@ -1400,10 +1752,14 @@ function App() {
 
             <div className="cart-footer">
               <div className="cart-total">
-                <span>SUBTOTAL</span>
+                <span>
+                  SUBTOTAL
+                </span>
 
                 <strong>
-                  {money(cartTotal)}
+                  {money(
+                    cartTotal
+                  )}
                 </strong>
               </div>
 
@@ -1415,7 +1771,9 @@ function App() {
 
               <button
                 className="checkout-btn"
-                onClick={openCheckout}
+                onClick={
+                  openCheckout
+                }
               >
                 CHECKOUT
                 <ArrowRight size={17} />
@@ -1424,7 +1782,9 @@ function App() {
               <button
                 className="continue-btn"
                 onClick={() =>
-                  setCartOpen(false)
+                  setCartOpen(
+                    false
+                  )
                 }
               >
                 CONTINUE SHOPPING
@@ -1456,23 +1816,28 @@ function App() {
 
             <div className="auth-brand">
               WEIRD
-              <span>CULTURE</span>
+              <span>
+                CULTURE
+              </span>
             </div>
 
             <span className="auth-kicker">
-              {authMode === "login"
+              {authMode ===
+              "login"
                 ? "WEIRD GANG / LOGIN"
                 : "WEIRD GANG / JOIN"}
             </span>
 
             <h2>
-              {authMode === "login"
+              {authMode ===
+              "login"
                 ? "WELCOME BACK."
                 : "JOIN THE GANG."}
             </h2>
 
             <p className="auth-copy">
-              {authMode === "login"
+              {authMode ===
+              "login"
                 ? "LOG IN TO YOUR WEIRD CULTURE ACCOUNT AND CONTINUE YOUR JOURNEY."
                 : "CREATE YOUR WEIRD CULTURE ACCOUNT AND STAY CLOSE TO THE NEXT DROP."}
             </p>
@@ -1481,7 +1846,8 @@ function App() {
               className="auth-form"
               onSubmit={handleAuth}
             >
-              {authMode === "signup" && (
+              {authMode ===
+                "signup" && (
                 <input
                   type="text"
                   placeholder="FULL NAME"
@@ -1502,7 +1868,9 @@ function App() {
               <input
                 type="email"
                 placeholder="EMAIL ADDRESS"
-                value={authForm.email}
+                value={
+                  authForm.email
+                }
                 onChange={(e) =>
                   setAuthForm({
                     ...authForm,
@@ -1534,16 +1902,19 @@ function App() {
                 className="auth-submit"
                 type="submit"
               >
-                {authMode === "login"
+                {authMode ===
+                "login"
                   ? "LOG IN"
                   : "CREATE ACCOUNT"}
+
                 <ArrowRight size={17} />
               </button>
             </form>
 
             <div className="auth-switch">
               <span>
-                {authMode === "login"
+                {authMode ===
+                "login"
                   ? "DON'T HAVE AN ACCOUNT?"
                   : "ALREADY IN THE GANG?"}
               </span>
@@ -1551,13 +1922,15 @@ function App() {
               <button
                 onClick={() =>
                   setAuthMode(
-                    authMode === "login"
+                    authMode ===
+                      "login"
                       ? "signup"
                       : "login"
                   )
                 }
               >
-                {authMode === "login"
+                {authMode ===
+                "login"
                   ? "CREATE ACCOUNT"
                   : "LOG IN"}
               </button>
@@ -1572,7 +1945,9 @@ function App() {
         <div
           className="side-panel-backdrop"
           onClick={() =>
-            setAccountOpen(false)
+            setAccountOpen(
+              false
+            )
           }
         >
           <aside
@@ -1587,13 +1962,17 @@ function App() {
                   WEIRD GANG / ACCOUNT
                 </span>
 
-                <h2>ACCOUNT</h2>
+                <h2>
+                  ACCOUNT
+                </h2>
               </div>
 
               <button
                 className="drawer-close"
                 onClick={() =>
-                  setAccountOpen(false)
+                  setAccountOpen(
+                    false
+                  )
                 }
               >
                 <X size={21} />
@@ -1607,7 +1986,8 @@ function App() {
 
               <div>
                 <strong>
-                  {user?.user_metadata
+                  {user
+                    ?.user_metadata
                     ?.full_name ||
                     "WEIRD MEMBER"}
                 </strong>
@@ -1621,12 +2001,16 @@ function App() {
             <button
               className="account-action"
               onClick={() => {
-                setAccountOpen(false);
+                setAccountOpen(
+                  false
+                );
                 openOrders();
               }}
             >
               <Package size={18} />
-              <span>MY ORDERS</span>
+              <span>
+                MY ORDERS
+              </span>
               <ChevronRight size={16} />
             </button>
 
@@ -1635,7 +2019,9 @@ function App() {
               onClick={logout}
             >
               <LogOut size={18} />
-              <span>LOG OUT</span>
+              <span>
+                LOG OUT
+              </span>
               <ChevronRight size={16} />
             </button>
           </aside>
@@ -1648,7 +2034,9 @@ function App() {
         <div
           className="checkout-backdrop"
           onClick={() =>
-            setCheckoutOpen(false)
+            setCheckoutOpen(
+              false
+            )
           }
         >
           <div
@@ -1660,7 +2048,9 @@ function App() {
             <button
               className="checkout-close"
               onClick={() =>
-                setCheckoutOpen(false)
+                setCheckoutOpen(
+                  false
+                )
               }
             >
               <X size={20} />
@@ -1671,12 +2061,16 @@ function App() {
                 WEIRD CULTURE / CHECKOUT
               </span>
 
-              <h2>DELIVERY DETAILS.</h2>
+              <h2>
+                DELIVERY DETAILS.
+              </h2>
             </div>
 
             <form
               className="checkout-form"
-              onSubmit={placeOrder}
+              onSubmit={
+                placeOrder
+              }
             >
               <div className="checkout-grid">
                 <input
@@ -1790,25 +2184,41 @@ function App() {
 
               <div className="checkout-summary">
                 <div>
-                  <span>SUBTOTAL</span>
+                  <span>
+                    SUBTOTAL
+                  </span>
+
                   <strong>
-                    {money(cartTotal)}
+                    {money(
+                      cartTotal
+                    )}
                   </strong>
                 </div>
 
                 <div>
-                  <span>SHIPPING</span>
+                  <span>
+                    SHIPPING
+                  </span>
+
                   <strong>
-                    {shipping === 0
+                    {shipping ===
+                    0
                       ? "FREE"
-                      : money(shipping)}
+                      : money(
+                          shipping
+                        )}
                   </strong>
                 </div>
 
                 <div className="checkout-total">
-                  <span>TOTAL</span>
+                  <span>
+                    TOTAL
+                  </span>
+
                   <strong>
-                    {money(grandTotal)}
+                    {money(
+                      grandTotal
+                    )}
                   </strong>
                 </div>
               </div>
@@ -1822,9 +2232,9 @@ function App() {
               </button>
 
               <p className="checkout-payment-note">
-                PAYMENT STATUS WILL REMAIN
-                PENDING UNTIL PAYMENT IS
-                CONNECTED.
+                PAYMENT STATUS WILL
+                REMAIN PENDING UNTIL
+                PAYMENT IS CONNECTED.
               </p>
             </form>
           </div>
@@ -1837,7 +2247,9 @@ function App() {
         <div
           className="side-panel-backdrop"
           onClick={() =>
-            setOrdersOpen(false)
+            setOrdersOpen(
+              false
+            )
           }
         >
           <aside
@@ -1852,13 +2264,17 @@ function App() {
                   WEIRD GANG / HISTORY
                 </span>
 
-                <h2>MY ORDERS</h2>
+                <h2>
+                  MY ORDERS
+                </h2>
               </div>
 
               <button
                 className="drawer-close"
                 onClick={() =>
-                  setOrdersOpen(false)
+                  setOrdersOpen(
+                    false
+                  )
                 }
               >
                 <X size={21} />
@@ -1869,7 +2285,8 @@ function App() {
               <div className="orders-empty">
                 LOADING ORDERS...
               </div>
-            ) : orders.length === 0 ? (
+            ) : orders.length ===
+              0 ? (
               <div className="orders-empty">
                 <Package size={35} />
 
@@ -1878,107 +2295,121 @@ function App() {
                 </h3>
 
                 <p>
-                  YOUR NEXT DROP STARTS HERE.
+                  YOUR NEXT DROP
+                  STARTS HERE.
                 </p>
               </div>
             ) : (
               <div className="orders-list">
-                {orders.map((order) => (
-                  <div
-                    className="order-card"
-                    key={order.id}
-                  >
-                    <div className="order-card-top">
-                      <div>
+                {orders.map(
+                  (order) => (
+                    <div
+                      className="order-card"
+                      key={
+                        order.id
+                      }
+                    >
+                      <div className="order-card-top">
+                        <div>
+                          <span>
+                            ORDER
+                          </span>
+
+                          <strong>
+                            #
+                            {order.id
+                              .slice(
+                                0,
+                                8
+                              )
+                              .toUpperCase()}
+                          </strong>
+                        </div>
+
+                        <span
+                          className={`order-status ${String(
+                            order.status
+                          ).toLowerCase()}`}
+                        >
+                          {
+                            order.status
+                          }
+                        </span>
+                      </div>
+
+                      <div className="order-items-mini">
+                        {Array.isArray(
+                          order.items
+                        ) &&
+                          order.items.map(
+                            (
+                              item,
+                              index
+                            ) => (
+                              <div
+                                key={`${order.id}-${index}`}
+                              >
+                                <img
+                                  src={
+                                    item.image
+                                  }
+                                  alt={
+                                    item.name
+                                  }
+                                />
+
+                                <div>
+                                  <strong>
+                                    {
+                                      item.name
+                                    }
+                                  </strong>
+
+                                  <span>
+                                    {item.variant
+                                      ? `${item.variant} · `
+                                      : ""}
+                                    SIZE{" "}
+                                    {item.size ||
+                                      "-"}{" "}
+                                    · QTY{" "}
+                                    {
+                                      item.quantity
+                                    }
+                                  </span>
+                                </div>
+                              </div>
+                            )
+                          )}
+                      </div>
+
+                      <div className="order-card-bottom">
                         <span>
-                          ORDER
+                          {new Date(
+                            order.created_at
+                          ).toLocaleDateString(
+                            "en-IN"
+                          )}
                         </span>
 
                         <strong>
-                          #
-                          {order.id
-                            .slice(0, 8)
-                            .toUpperCase()}
+                          {money(
+                            order.total
+                          )}
                         </strong>
                       </div>
-
-                      <span
-                        className={`order-status ${String(
-                          order.status
-                        ).toLowerCase()}`}
-                      >
-                        {order.status}
-                      </span>
                     </div>
-
-                    <div className="order-items-mini">
-                      {Array.isArray(
-                        order.items
-                      ) &&
-                        order.items.map(
-                          (
-                            item,
-                            index
-                          ) => (
-                            <div
-                              key={`${order.id}-${index}`}
-                            >
-                              <img
-                                src={
-                                  item.image
-                                }
-                                alt={
-                                  item.name
-                                }
-                              />
-
-                              <div>
-                                <strong>
-                                  {
-                                    item.name
-                                  }
-                                </strong>
-
-                                <span>
-                                  {item.variant
-                                    ? `${item.variant} · `
-                                    : ""}
-                                  SIZE{" "}
-                                  {item.size ||
-                                    "-"}{" "}
-                                  · QTY{" "}
-                                  {
-                                    item.quantity
-                                  }
-                                </span>
-                              </div>
-                            </div>
-                          )
-                        )}
-                    </div>
-
-                    <div className="order-card-bottom">
-                      <span>
-                        {new Date(
-                          order.created_at
-                        ).toLocaleDateString(
-                          "en-IN"
-                        )}
-                      </span>
-
-                      <strong>
-                        {money(
-                          order.total
-                        )}
-                      </strong>
-                    </div>
-                  </div>
-                ))}
+                  )
+                )}
               </div>
             )}
           </aside>
         </div>
       )}
+
+      {/* =========================
+          MAIN WEBSITE
+      ========================= */}
 
       <main>
         {/* HERO */}
@@ -1999,7 +2430,8 @@ function App() {
           <div className="hero-content">
             <div className="hero-kicker">
               <span className="red-dot" />
-              UNDERGROUND / INDIA / 2026
+              UNDERGROUND / INDIA /
+              2026
             </div>
 
             <h1>
@@ -2043,22 +2475,31 @@ function App() {
             <span>
               WEIRD CULTURE
             </span>
+
             <i>✦</i>
+
             <span>
               WEIRD GANG
             </span>
+
             <i>✦</i>
+
             <span>
               NO NORMAL PEOPLE
             </span>
+
             <i>✦</i>
+
             <span>
               WEIRD CULTURE
             </span>
+
             <i>✦</i>
+
             <span>
               WEIRD GANG
             </span>
+
             <i>✦</i>
           </div>
         </section>
@@ -2124,7 +2565,9 @@ function App() {
             </span>
 
             <span>
-              {filteredProducts.length}{" "}
+              {
+                filteredProducts.length
+              }{" "}
               PRODUCTS
             </span>
           </div>
@@ -2142,7 +2585,9 @@ function App() {
                       ? "product-card-large"
                       : ""
                   }`}
-                  key={product.id}
+                  key={
+                    product.id
+                  }
                 >
                   <div className="product-image-wrap">
                     <img
@@ -2157,7 +2602,9 @@ function App() {
 
                     {product.tag && (
                       <span className="product-tag">
-                        {product.tag}
+                        {
+                          product.tag
+                        }
                       </span>
                     )}
 
@@ -2247,7 +2694,9 @@ function App() {
             <h2>
               STAY
               <br />
-              <span>WEIRD.</span>
+              <span>
+                WEIRD.
+              </span>
             </h2>
 
             <p className="statement-copy">
@@ -2473,8 +2922,14 @@ function App() {
             />
 
             <div className="gang-stamp">
-              <span>WEIRD</span>
-              <strong>GANG</strong>
+              <span>
+                WEIRD
+              </span>
+
+              <strong>
+                GANG
+              </strong>
+
               <span>
                 EST. 2026
               </span>
@@ -2541,7 +2996,9 @@ function App() {
 
           <div className="footer-links">
             <div>
-              <span>SHOP</span>
+              <span>
+                SHOP
+              </span>
 
               <a href="#shop">
                 ALL PRODUCTS
@@ -2561,7 +3018,9 @@ function App() {
             </div>
 
             <div>
-              <span>INFO</span>
+              <span>
+                INFO
+              </span>
 
               <a href="#">
                 ABOUT US
@@ -2577,7 +3036,9 @@ function App() {
             </div>
 
             <div>
-              <span>SOCIAL</span>
+              <span>
+                SOCIAL
+              </span>
 
               <a href="#">
                 INSTAGRAM
@@ -2599,7 +3060,9 @@ function App() {
             MADE FOR THE WEIRD.
           </span>
 
-          <span>INDIA</span>
+          <span>
+            INDIA
+          </span>
         </div>
       </footer>
     </div>
