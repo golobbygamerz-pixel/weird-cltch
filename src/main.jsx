@@ -18,7 +18,9 @@ import {
   User,
   LogOut,
   Package,
-  ChevronRight
+  ChevronRight,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import "./styles.css";
@@ -63,6 +65,14 @@ const image = (name) =>
   `${import.meta.env.BASE_URL}images/${name}`;
 
 const sizes = ["S", "M", "L", "XL", "XXL"];
+
+const AUTH_LOCK_KEY =
+  "weird_culture_auth_lock_v1";
+
+const MAX_LOGIN_ATTEMPTS = 3;
+
+const LOCK_DURATION =
+  30 * 60 * 1000;
 
 /* =========================
    PRODUCTS
@@ -176,13 +186,23 @@ const money = (value) =>
   `₹${Number(value).toLocaleString("en-IN")}`;
 
 function App() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [cartOpen, setCartOpen] = useState(false);
-  const [cart, setCart] = useState([]);
+  const [menuOpen, setMenuOpen] =
+    useState(false);
+
+  const [cartOpen, setCartOpen] =
+    useState(false);
+
+  const [cart, setCart] =
+    useState([]);
+
   const [activeCategory, setActiveCategory] =
     useState("ALL");
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [search, setSearch] = useState("");
+
+  const [searchOpen, setSearchOpen] =
+    useState(false);
+
+  const [search, setSearch] =
+    useState("");
 
   const [productModal, setProductModal] =
     useState(null);
@@ -196,7 +216,9 @@ function App() {
   const [selectedQuantity, setSelectedQuantity] =
     useState(1);
 
-  const [authOpen, setAuthOpen] = useState(false);
+  const [authOpen, setAuthOpen] =
+    useState(false);
+
   const [authMode, setAuthMode] =
     useState("login");
 
@@ -209,17 +231,45 @@ function App() {
   const [ordersOpen, setOrdersOpen] =
     useState(false);
 
-  const [user, setUser] = useState(null);
+  const [user, setUser] =
+    useState(null);
+
   const [authLoading, setAuthLoading] =
     useState(true);
 
   const carouselRef = useRef(null);
 
-  const [authForm, setAuthForm] = useState({
-    email: "",
-    password: "",
-    fullName: ""
-  });
+  const [authForm, setAuthForm] =
+    useState({
+      email: "",
+      password: "",
+      fullName: ""
+    });
+
+  const [
+    showLoginPassword,
+    setShowLoginPassword
+  ] = useState(false);
+
+  const [
+    showSignupPassword,
+    setShowSignupPassword
+  ] = useState(false);
+
+  const [
+    loginAttempts,
+    setLoginAttempts
+  ] = useState(0);
+
+  const [
+    loginLockedUntil,
+    setLoginLockedUntil
+  ] = useState(0);
+
+  const [
+    lockCountdown,
+    setLockCountdown
+  ] = useState(0);
 
   const [checkoutForm, setCheckoutForm] =
     useState({
@@ -232,9 +282,335 @@ function App() {
       pincode: ""
     });
 
-  const [orders, setOrders] = useState([]);
+  const [orders, setOrders] =
+    useState([]);
+
   const [ordersLoading, setOrdersLoading] =
     useState(false);
+
+  /* =========================
+     AUTH LOCK HELPERS
+  ========================= */
+
+  const readAuthLocks = () => {
+    try {
+      const saved =
+        localStorage.getItem(
+          AUTH_LOCK_KEY
+        );
+
+      if (!saved) {
+        return {};
+      }
+
+      const parsed =
+        JSON.parse(saved);
+
+      return parsed &&
+        typeof parsed === "object"
+        ? parsed
+        : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const writeAuthLocks = (
+    locks
+  ) => {
+    try {
+      localStorage.setItem(
+        AUTH_LOCK_KEY,
+        JSON.stringify(locks)
+      );
+    } catch {
+      // Ignore storage errors.
+    }
+  };
+
+  const getEmailLock = (
+    email
+  ) => {
+    const normalizedEmail =
+      String(email || "")
+        .trim()
+        .toLowerCase();
+
+    if (!normalizedEmail) {
+      return {
+        attempts: 0,
+        lockedUntil: 0
+      };
+    }
+
+    const locks =
+      readAuthLocks();
+
+    const record =
+      locks[normalizedEmail];
+
+    if (!record) {
+      return {
+        attempts: 0,
+        lockedUntil: 0
+      };
+    }
+
+    if (
+      record.lockedUntil &&
+      Date.now() >=
+        record.lockedUntil
+    ) {
+      delete locks[
+        normalizedEmail
+      ];
+
+      writeAuthLocks(locks);
+
+      return {
+        attempts: 0,
+        lockedUntil: 0
+      };
+    }
+
+    return {
+      attempts:
+        Number(
+          record.attempts
+        ) || 0,
+      lockedUntil:
+        Number(
+          record.lockedUntil
+        ) || 0
+    };
+  };
+
+  const syncEmailLock = (
+    email
+  ) => {
+    const record =
+      getEmailLock(email);
+
+    setLoginAttempts(
+      record.attempts
+    );
+
+    setLoginLockedUntil(
+      record.lockedUntil
+    );
+
+    return record;
+  };
+
+  const registerFailedLogin = (
+    email
+  ) => {
+    const normalizedEmail =
+      String(email || "")
+        .trim()
+        .toLowerCase();
+
+    if (!normalizedEmail) {
+      return {
+        attempts: 0,
+        lockedUntil: 0
+      };
+    }
+
+    const locks =
+      readAuthLocks();
+
+    const existing =
+      locks[
+        normalizedEmail
+      ] || {
+        attempts: 0,
+        lockedUntil: 0
+      };
+
+    let attempts =
+      Number(
+        existing.attempts
+      ) || 0;
+
+    let lockedUntil =
+      Number(
+        existing.lockedUntil
+      ) || 0;
+
+    if (
+      lockedUntil &&
+      Date.now() <
+        lockedUntil
+    ) {
+      return {
+        attempts,
+        lockedUntil
+      };
+    }
+
+    attempts += 1;
+
+    if (
+      attempts >=
+      MAX_LOGIN_ATTEMPTS
+    ) {
+      lockedUntil =
+        Date.now() +
+        LOCK_DURATION;
+
+      attempts =
+        MAX_LOGIN_ATTEMPTS;
+    }
+
+    locks[
+      normalizedEmail
+    ] = {
+      attempts,
+      lockedUntil
+    };
+
+    writeAuthLocks(locks);
+
+    setLoginAttempts(
+      attempts
+    );
+
+    setLoginLockedUntil(
+      lockedUntil
+    );
+
+    return {
+      attempts,
+      lockedUntil
+    };
+  };
+
+  const clearLoginLock = (
+    email
+  ) => {
+    const normalizedEmail =
+      String(email || "")
+        .trim()
+        .toLowerCase();
+
+    if (!normalizedEmail) {
+      return;
+    }
+
+    const locks =
+      readAuthLocks();
+
+    delete locks[
+      normalizedEmail
+    ];
+
+    writeAuthLocks(locks);
+
+    setLoginAttempts(0);
+    setLoginLockedUntil(0);
+    setLockCountdown(0);
+  };
+
+  const formatLockTime = (
+    milliseconds
+  ) => {
+    const totalSeconds =
+      Math.max(
+        0,
+        Math.ceil(
+          milliseconds / 1000
+        )
+      );
+
+    const minutes =
+      Math.floor(
+        totalSeconds / 60
+      );
+
+    const seconds =
+      totalSeconds % 60;
+
+    return `${String(
+      minutes
+    ).padStart(
+      2,
+      "0"
+    )}:${String(
+      seconds
+    ).padStart(
+      2,
+      "0"
+    )}`;
+  };
+
+  /* =========================
+     AUTH LOCK SYNC
+  ========================= */
+
+  useEffect(() => {
+    if (
+      authMode !== "login" ||
+      !authOpen
+    ) {
+      return;
+    }
+
+    const email =
+      authForm.email.trim();
+
+    if (!email) {
+      setLoginAttempts(0);
+      setLoginLockedUntil(0);
+      setLockCountdown(0);
+      return;
+    }
+
+    syncEmailLock(email);
+  }, [
+    authForm.email,
+    authMode,
+    authOpen
+  ]);
+
+  useEffect(() => {
+    if (!loginLockedUntil) {
+      setLockCountdown(0);
+      return;
+    }
+
+    const updateCountdown =
+      () => {
+        const remaining =
+          loginLockedUntil -
+          Date.now();
+
+        if (remaining <= 0) {
+          clearLoginLock(
+            authForm.email
+          );
+          return;
+        }
+
+        setLockCountdown(
+          remaining
+        );
+      };
+
+    updateCountdown();
+
+    const interval =
+      setInterval(
+        updateCountdown,
+        1000
+      );
+
+    return () =>
+      clearInterval(interval);
+  }, [
+    loginLockedUntil,
+    authForm.email
+  ]);
 
   /* =========================
      AUTH SESSION
@@ -260,8 +636,10 @@ function App() {
 
         if (mounted) {
           setUser(
-            data?.session?.user || null
+            data?.session?.user ||
+              null
           );
+
           setAuthLoading(false);
         }
       })
@@ -278,18 +656,21 @@ function App() {
 
     const {
       data: listener
-    } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (mounted) {
-          setUser(
-            session?.user || null
-          );
+    } =
+      supabase.auth.onAuthStateChange(
+        (_event, session) => {
+          if (mounted) {
+            setUser(
+              session?.user ||
+                null
+            );
+          }
         }
-      }
-    );
+      );
 
     return () => {
       mounted = false;
+
       listener?.subscription?.unsubscribe();
     };
   }, []);
@@ -311,7 +692,8 @@ function App() {
         : "";
 
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow =
+        "";
     };
   }, [
     menuOpen,
@@ -329,10 +711,13 @@ function App() {
 
   useEffect(() => {
     if (user) {
-      setCheckoutForm((current) => ({
-        ...current,
-        email: user.email || ""
-      }));
+      setCheckoutForm(
+        (current) => ({
+          ...current,
+          email:
+            user.email || ""
+        })
+      );
 
       loadProfile();
     }
@@ -342,18 +727,21 @@ function App() {
      CART
   ========================= */
 
-  const cartCount = cart.reduce(
-    (total, item) =>
-      total + item.quantity,
-    0
-  );
+  const cartCount =
+    cart.reduce(
+      (total, item) =>
+        total + item.quantity,
+      0
+    );
 
-  const cartTotal = cart.reduce(
-    (total, item) =>
-      total +
-      item.price * item.quantity,
-    0
-  );
+  const cartTotal =
+    cart.reduce(
+      (total, item) =>
+        total +
+        item.price *
+          item.quantity,
+      0
+    );
 
   const shipping =
     cartTotal >= 1999 ||
@@ -368,42 +756,51 @@ function App() {
      PRODUCT FILTER
   ========================= */
 
-  const filteredProducts = useMemo(() => {
-    const query =
-      search.trim().toLowerCase();
+  const filteredProducts =
+    useMemo(() => {
+      const query =
+        search
+          .trim()
+          .toLowerCase();
 
-    return products.filter(
-      (product) => {
-        const matchesSearch =
-          product.name
-            .toLowerCase()
-            .includes(query);
+      return products.filter(
+        (product) => {
+          const matchesSearch =
+            product.name
+              .toLowerCase()
+              .includes(query);
 
-        if (!matchesSearch) {
-          return false;
-        }
+          if (!matchesSearch) {
+            return false;
+          }
 
-        if (activeCategory === "ALL") {
-          return true;
-        }
+          if (
+            activeCategory ===
+            "ALL"
+          ) {
+            return true;
+          }
 
-        if (
-          activeCategory ===
-          "NEW DROP"
-        ) {
-          return (
-            product.tag ===
+          if (
+            activeCategory ===
             "NEW DROP"
+          ) {
+            return (
+              product.tag ===
+              "NEW DROP"
+            );
+          }
+
+          return (
+            product.category ===
+            activeCategory
           );
         }
-
-        return (
-          product.category ===
-          activeCategory
-        );
-      }
-    );
-  }, [activeCategory, search]);
+      );
+    }, [
+      activeCategory,
+      search
+    ]);
 
   /* =========================
      PRODUCT MODAL
@@ -418,101 +815,115 @@ function App() {
     setSelectedQuantity(1);
 
     setTimeout(() => {
-      if (carouselRef.current) {
-        carouselRef.current.scrollTo({
-          left: 0,
-          behavior: "instant"
-        });
+      if (
+        carouselRef.current
+      ) {
+        carouselRef.current.scrollTo(
+          {
+            left: 0,
+            behavior: "instant"
+          }
+        );
       }
     }, 0);
   };
 
-  const closeProductOptions = () => {
-    setProductModal(null);
-    setSelectedVariant(0);
-    setSelectedSize("");
-    setSelectedQuantity(1);
-  };
+  const closeProductOptions =
+    () => {
+      setProductModal(null);
+      setSelectedVariant(0);
+      setSelectedSize("");
+      setSelectedQuantity(1);
+    };
 
-  const handleCarouselScroll = (
-    event
-  ) => {
-    const container =
-      event.currentTarget;
+  const handleCarouselScroll =
+    (event) => {
+      const container =
+        event.currentTarget;
 
-    if (
-      !productModal?.variants?.length
-    ) {
-      return;
-    }
+      if (
+        !productModal?.variants
+          ?.length
+      ) {
+        return;
+      }
 
-    const slides =
-      container.querySelectorAll(
-        ".product-carousel-slide"
+      const slides =
+        container.querySelectorAll(
+          ".product-carousel-slide"
+        );
+
+      if (!slides.length) {
+        return;
+      }
+
+      const containerCenter =
+        container.scrollLeft +
+        container.clientWidth /
+          2;
+
+      let closestIndex = 0;
+      let closestDistance =
+        Infinity;
+
+      slides.forEach(
+        (
+          slide,
+          index
+        ) => {
+          const slideCenter =
+            slide.offsetLeft +
+            slide.offsetWidth /
+              2;
+
+          const distance =
+            Math.abs(
+              containerCenter -
+                slideCenter
+            );
+
+          if (
+            distance <
+            closestDistance
+          ) {
+            closestDistance =
+              distance;
+
+            closestIndex =
+              index;
+          }
+        }
       );
 
-    if (!slides.length) {
-      return;
-    }
+      setSelectedVariant(
+        closestIndex
+      );
+    };
 
-    const containerCenter =
-      container.scrollLeft +
-      container.clientWidth / 2;
+  const selectCarouselVariant =
+    (index) => {
+      setSelectedVariant(
+        index
+      );
 
-    let closestIndex = 0;
-    let closestDistance = Infinity;
+      const container =
+        carouselRef.current;
 
-    slides.forEach(
-      (slide, index) => {
-        const slideCenter =
-          slide.offsetLeft +
-          slide.offsetWidth / 2;
-
-        const distance =
-          Math.abs(
-            containerCenter -
-              slideCenter
-          );
-
-        if (
-          distance <
-          closestDistance
-        ) {
-          closestDistance =
-            distance;
-          closestIndex = index;
-        }
+      if (!container) {
+        return;
       }
-    );
 
-    setSelectedVariant(
-      closestIndex
-    );
-  };
+      const slide =
+        container.querySelectorAll(
+          ".product-carousel-slide"
+        )[index];
 
-  const selectCarouselVariant = (
-    index
-  ) => {
-    setSelectedVariant(index);
-
-    const container =
-      carouselRef.current;
-
-    if (!container) {
-      return;
-    }
-
-    const slide =
-      container.querySelectorAll(
-        ".product-carousel-slide"
-      )[index];
-
-    slide?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "center"
-    });
-  };
+      slide?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center"
+      });
+    };
 
   /* =========================
      CART FUNCTIONS
@@ -576,32 +987,34 @@ function App() {
     setCartOpen(true);
   };
 
-  const handleProductAdd = () => {
-    if (!productModal) {
-      return;
-    }
+  const handleProductAdd =
+    () => {
+      if (!productModal) {
+        return;
+      }
 
-    if (!selectedSize) {
-      alert(
-        "PLEASE SELECT A SIZE."
+      if (!selectedSize) {
+        alert(
+          "PLEASE SELECT A SIZE."
+        );
+        return;
+      }
+
+      const variant =
+        productModal
+          .variants?.[
+          selectedVariant
+        ] || null;
+
+      addToCart(
+        productModal,
+        variant,
+        selectedSize,
+        selectedQuantity
       );
-      return;
-    }
 
-    const variant =
-      productModal.variants?.[
-        selectedVariant
-      ] || null;
-
-    addToCart(
-      productModal,
-      variant,
-      selectedSize,
-      selectedQuantity
-    );
-
-    closeProductOptions();
-  };
+      closeProductOptions();
+    };
 
   const increaseQuantity = (
     id
@@ -661,31 +1074,37 @@ function App() {
      NAVIGATION
   ========================= */
 
-  const scrollToProducts = () => {
-    setActiveCategory("ALL");
+  const scrollToProducts =
+    () => {
+      setActiveCategory("ALL");
 
-    setTimeout(() => {
-      document
-        .getElementById("shop")
-        ?.scrollIntoView({
-          behavior: "smooth"
-        });
-    }, 50);
-  };
+      setTimeout(() => {
+        document
+          .getElementById(
+            "shop"
+          )
+          ?.scrollIntoView({
+            behavior: "smooth"
+          });
+      }, 50);
+    };
 
-  const scrollToNewDrop = () => {
-    setActiveCategory(
-      "NEW DROP"
-    );
+  const scrollToNewDrop =
+    () => {
+      setActiveCategory(
+        "NEW DROP"
+      );
 
-    setTimeout(() => {
-      document
-        .getElementById("shop")
-        ?.scrollIntoView({
-          behavior: "smooth"
-        });
-    }, 50);
-  };
+      setTimeout(() => {
+        document
+          .getElementById(
+            "shop"
+          )
+          ?.scrollIntoView({
+            behavior: "smooth"
+          });
+      }, 50);
+    };
 
   const closeMenu = () =>
     setMenuOpen(false);
@@ -700,6 +1119,14 @@ function App() {
     setAuthMode(mode);
     setAuthOpen(true);
     setAccountOpen(false);
+
+    if (mode === "login") {
+      setTimeout(() => {
+        syncEmailLock(
+          authForm.email
+        );
+      }, 0);
+    }
   };
 
   const closeAuth = () => {
@@ -710,6 +1137,32 @@ function App() {
       password: "",
       fullName: ""
     });
+
+    setShowLoginPassword(
+      false
+    );
+
+    setShowSignupPassword(
+      false
+    );
+
+    setLoginAttempts(0);
+    setLoginLockedUntil(0);
+    setLockCountdown(0);
+  };
+
+  const switchAuthMode = (
+    mode
+  ) => {
+    setAuthMode(mode);
+
+    if (mode === "login") {
+      setTimeout(() => {
+        syncEmailLock(
+          authForm.email
+        );
+      }, 0);
+    }
   };
 
   const handleAuth = async (
@@ -724,19 +1177,34 @@ function App() {
       return;
     }
 
-    try {
-      if (
-        authMode ===
-        "signup"
-      ) {
+    const email =
+      authForm.email
+        .trim()
+        .toLowerCase();
+
+    if (!email) {
+      alert(
+        "PLEASE ENTER YOUR EMAIL ADDRESS."
+      );
+      return;
+    }
+
+    /* =========================
+       SIGN UP
+    ========================= */
+
+    if (
+      authMode ===
+      "signup"
+    ) {
+      try {
         const {
           data,
           error
         } =
           await supabase.auth.signUp(
             {
-              email:
-                authForm.email.trim(),
+              email,
               password:
                 authForm.password,
               options: {
@@ -756,15 +1224,20 @@ function App() {
           const {
             error:
               profileError
-          } = await supabase
-            .from("profiles")
-            .upsert({
-              id: data.user.id,
-              full_name:
-                authForm.fullName.trim()
-            });
+          } =
+            await supabase
+              .from(
+                "profiles"
+              )
+              .upsert({
+                id: data.user.id,
+                full_name:
+                  authForm.fullName.trim()
+              });
 
-          if (profileError) {
+          if (
+            profileError
+          ) {
             console.error(
               "Profile creation error:",
               profileError
@@ -778,23 +1251,99 @@ function App() {
 
         closeAuth();
         return;
-      }
+      } catch (error) {
+        console.error(
+          "Signup error:",
+          error
+        );
 
+        alert(
+          error?.message ||
+            "ACCOUNT CREATION FAILED."
+        );
+
+        return;
+      }
+    }
+
+    /* =========================
+       LOGIN LOCK CHECK
+    ========================= */
+
+    const lock =
+      syncEmailLock(email);
+
+    if (
+      lock.lockedUntil &&
+      Date.now() <
+        lock.lockedUntil
+    ) {
+      const remaining =
+        lock.lockedUntil -
+        Date.now();
+
+      alert(
+        `TOO MANY FAILED LOGIN ATTEMPTS.\nTRY AGAIN IN ${formatLockTime(
+          remaining
+        )}.`
+      );
+
+      return;
+    }
+
+    /* =========================
+       LOGIN
+    ========================= */
+
+    try {
       const {
         error
       } =
         await supabase.auth.signInWithPassword(
           {
-            email:
-              authForm.email.trim(),
+            email,
             password:
               authForm.password
           }
         );
 
       if (error) {
-        throw error;
+        const failed =
+          registerFailedLogin(
+            email
+          );
+
+        if (
+          failed.lockedUntil &&
+          Date.now() <
+            failed.lockedUntil
+        ) {
+          alert(
+            "3 WRONG PASSWORD ATTEMPTS.\nYOUR LOGIN HAS BEEN LOCKED FOR 30 MINUTES."
+          );
+        } else {
+          const remaining =
+            Math.max(
+              0,
+              MAX_LOGIN_ATTEMPTS -
+                failed.attempts
+            );
+
+          alert(
+            `WRONG EMAIL OR PASSWORD.\n${remaining} LOGIN ATTEMPT${
+              remaining === 1
+                ? ""
+                : "S"
+            } REMAINING.`
+          );
+        }
+
+        return;
       }
+
+      clearLoginLock(
+        email
+      );
 
       closeAuth();
     } catch (error) {
@@ -833,84 +1382,92 @@ function App() {
      PROFILE
   ========================= */
 
-  const loadProfile = async () => {
-    if (!supabase || !user) {
-      return;
-    }
-
-    try {
-      const {
-        data,
-        error
-      } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error(
-          "Profile load error:",
-          error
-        );
+  const loadProfile =
+    async () => {
+      if (!supabase || !user) {
         return;
       }
 
-      if (data) {
-        setCheckoutForm(
-          (current) => ({
-            ...current,
-            fullName:
-              data.full_name ||
-              current.fullName,
-            phone:
-              data.phone ||
-              current.phone,
-            address:
-              data.address ||
-              current.address,
-            city:
-              data.city ||
-              current.city,
-            state:
-              data.state ||
-              current.state,
-            pincode:
-              data.pincode ||
-              current.pincode
-          })
+      try {
+        const {
+          data,
+          error
+        } =
+          await supabase
+            .from(
+              "profiles"
+            )
+            .select("*")
+            .eq(
+              "id",
+              user.id
+            )
+            .maybeSingle();
+
+        if (error) {
+          console.error(
+            "Profile load error:",
+            error
+          );
+          return;
+        }
+
+        if (data) {
+          setCheckoutForm(
+            (current) => ({
+              ...current,
+              fullName:
+                data.full_name ||
+                current.fullName,
+              phone:
+                data.phone ||
+                current.phone,
+              address:
+                data.address ||
+                current.address,
+              city:
+                data.city ||
+                current.city,
+              state:
+                data.state ||
+                current.state,
+              pincode:
+                data.pincode ||
+                current.pincode
+            })
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Profile request failed:",
+          error
         );
       }
-    } catch (error) {
-      console.error(
-        "Profile request failed:",
-        error
-      );
-    }
-  };
+    };
 
   /* =========================
      CHECKOUT
   ========================= */
 
-  const openCheckout = () => {
-    if (!cart.length) {
-      alert(
-        "YOUR BAG IS EMPTY."
-      );
-      return;
-    }
+  const openCheckout =
+    () => {
+      if (!cart.length) {
+        alert(
+          "YOUR BAG IS EMPTY."
+        );
+        return;
+      }
 
-    if (!user) {
+      if (!user) {
+        setCartOpen(false);
+        openAuth("login");
+        return;
+      }
+
       setCartOpen(false);
-      openAuth("login");
-      return;
-    }
-
-    setCartOpen(false);
-    setCheckoutOpen(true);
-    loadProfile();
-  };
+      setCheckoutOpen(true);
+      loadProfile();
+    };
 
   const placeOrder = async (
     event
@@ -935,8 +1492,9 @@ function App() {
       requiredFields.some(
         (field) =>
           !String(
-            checkoutForm[field] ||
-              ""
+            checkoutForm[
+              field
+            ] || ""
           ).trim()
       );
 
@@ -950,23 +1508,24 @@ function App() {
     try {
       const {
         error: profileError
-      } = await supabase
-        .from("profiles")
-        .upsert({
-          id: user.id,
-          full_name:
-            checkoutForm.fullName.trim(),
-          phone:
-            checkoutForm.phone.trim(),
-          address:
-            checkoutForm.address.trim(),
-          city:
-            checkoutForm.city.trim(),
-          state:
-            checkoutForm.state.trim(),
-          pincode:
-            checkoutForm.pincode.trim()
-        });
+      } =
+        await supabase
+          .from("profiles")
+          .upsert({
+            id: user.id,
+            full_name:
+              checkoutForm.fullName.trim(),
+            phone:
+              checkoutForm.phone.trim(),
+            address:
+              checkoutForm.address.trim(),
+            city:
+              checkoutForm.city.trim(),
+            state:
+              checkoutForm.state.trim(),
+            pincode:
+              checkoutForm.pincode.trim()
+          });
 
       if (profileError) {
         throw profileError;
@@ -974,55 +1533,67 @@ function App() {
 
       const orderItems =
         cart.map((item) => ({
-          product_id: item.id,
-          name: item.name,
+          product_id:
+            item.id,
+          name:
+            item.name,
           variant:
             item.variantName ||
             null,
           size:
             item.size || null,
-          price: item.price,
+          price:
+            item.price,
           quantity:
             item.quantity,
-          image: item.image
+          image:
+            item.image
         }));
 
       const {
         error: orderError
-      } = await supabase
-        .from("orders")
-        .insert({
-          user_id: user.id,
-          customer_name:
-            checkoutForm.fullName.trim(),
-          phone:
-            checkoutForm.phone.trim(),
-          email:
-            checkoutForm.email.trim() ||
-            user.email,
-          address:
-            checkoutForm.address.trim(),
-          city:
-            checkoutForm.city.trim(),
-          state:
-            checkoutForm.state.trim(),
-          pincode:
-            checkoutForm.pincode.trim(),
-          items: orderItems,
-          subtotal: cartTotal,
-          shipping,
-          total: grandTotal,
-          status: "PENDING",
-          payment_status:
-            "PENDING"
-        });
+      } =
+        await supabase
+          .from("orders")
+          .insert({
+            user_id:
+              user.id,
+            customer_name:
+              checkoutForm.fullName.trim(),
+            phone:
+              checkoutForm.phone.trim(),
+            email:
+              checkoutForm.email.trim() ||
+              user.email,
+            address:
+              checkoutForm.address.trim(),
+            city:
+              checkoutForm.city.trim(),
+            state:
+              checkoutForm.state.trim(),
+            pincode:
+              checkoutForm.pincode.trim(),
+            items:
+              orderItems,
+            subtotal:
+              cartTotal,
+            shipping,
+            total:
+              grandTotal,
+            status:
+              "PENDING",
+            payment_status:
+              "PENDING"
+          });
 
       if (orderError) {
         throw orderError;
       }
 
       setCart([]);
-      setCheckoutOpen(false);
+      setCheckoutOpen(
+        false
+      );
 
       alert(
         "ORDER PLACED SUCCESSFULLY. PAYMENT STATUS: PENDING."
@@ -1046,57 +1617,70 @@ function App() {
      ORDERS
   ========================= */
 
-  const loadOrders = async () => {
-    if (!supabase || !user) {
-      return;
-    }
-
-    setOrdersLoading(true);
-
-    try {
-      const {
-        data,
-        error
-      } = await supabase
-        .from("orders")
-        .select("*")
-        .eq(
-          "user_id",
-          user.id
-        )
-        .order("created_at", {
-          ascending: false
-        });
-
-      if (error) {
-        throw error;
+  const loadOrders =
+    async () => {
+      if (!supabase || !user) {
+        return;
       }
 
-      setOrders(data || []);
-    } catch (error) {
-      console.error(
-        "Orders error:",
-        error
-      );
+      setOrdersLoading(true);
 
-      alert(
-        error?.message ||
-          "COULD NOT LOAD ORDERS."
-      );
-    } finally {
-      setOrdersLoading(false);
-    }
-  };
+      try {
+        const {
+          data,
+          error
+        } =
+          await supabase
+            .from(
+              "orders"
+            )
+            .select("*")
+            .eq(
+              "user_id",
+              user.id
+            )
+            .order(
+              "created_at",
+              {
+                ascending:
+                  false
+              }
+            );
 
-  const openOrders = async () => {
-    if (!user) {
-      openAuth("login");
-      return;
-    }
+        if (error) {
+          throw error;
+        }
 
-    setOrdersOpen(true);
-    await loadOrders();
-  };
+        setOrders(
+          data || []
+        );
+      } catch (error) {
+        console.error(
+          "Orders error:",
+          error
+        );
+
+        alert(
+          error?.message ||
+            "COULD NOT LOAD ORDERS."
+        );
+      } finally {
+        setOrdersLoading(
+          false
+        );
+      }
+    };
+
+  const openOrders =
+    async () => {
+      if (!user) {
+        openAuth("login");
+        return;
+      }
+
+      setOrdersOpen(true);
+      await loadOrders();
+    };
 
   const modalVariants =
     productModal?.variants || [];
@@ -1105,6 +1689,13 @@ function App() {
     modalVariants[
       selectedVariant
     ] || null;
+
+  const loginIsLocked =
+    Boolean(
+      loginLockedUntil &&
+        Date.now() <
+          loginLockedUntil
+    );
 
   return (
     <div className="site">
@@ -1130,9 +1721,14 @@ function App() {
           <Menu size={21} />
         </button>
 
-        <a href="#" className="logo">
+        <a
+          href="#"
+          className="logo"
+        >
           WEIRD
-          <span>CULTURE</span>
+          <span>
+            CULTURE
+          </span>
         </a>
 
         <nav className="desktop-nav">
@@ -1162,7 +1758,8 @@ function App() {
             className="icon-btn search-btn"
             onClick={() =>
               setSearchOpen(
-                (value) => !value
+                (value) =>
+                  !value
               )
             }
             aria-label="Search"
@@ -1198,6 +1795,7 @@ function App() {
             aria-label="Open cart"
           >
             <ShoppingBag size={19} />
+
             <span>
               {cartCount}
             </span>
@@ -1228,6 +1826,7 @@ function App() {
               setSearchOpen(
                 false
               );
+
               setSearch("");
             }}
           >
@@ -1241,7 +1840,9 @@ function App() {
       {menuOpen && (
         <div className="mobile-menu">
           <div className="mobile-menu-top">
-            <span>MENU</span>
+            <span>
+              MENU
+            </span>
 
             <button
               className="icon-btn"
@@ -1664,6 +2265,7 @@ function App() {
                             {
                               item.variantName
                             }
+
                             {item.size
                               ? ` · SIZE ${item.size}`
                               : ""}
@@ -1802,7 +2404,7 @@ function App() {
           onClick={closeAuth}
         >
           <div
-            className="auth-modal"
+            className={`auth-modal auth-${authMode}`}
             onClick={(e) =>
               e.stopPropagation()
             }
@@ -1810,6 +2412,7 @@ function App() {
             <button
               className="auth-close"
               onClick={closeAuth}
+              aria-label="Close authentication"
             >
               <X size={20} />
             </button>
@@ -1821,119 +2424,342 @@ function App() {
               </span>
             </div>
 
-            <span className="auth-kicker">
-              {authMode ===
-              "login"
-                ? "WEIRD GANG / LOGIN"
-                : "WEIRD GANG / JOIN"}
-            </span>
+            {/* AUTH SLIDE TABS */}
 
-            <h2>
-              {authMode ===
-              "login"
-                ? "WELCOME BACK."
-                : "JOIN THE GANG."}
-            </h2>
-
-            <p className="auth-copy">
-              {authMode ===
-              "login"
-                ? "LOG IN TO YOUR WEIRD CULTURE ACCOUNT AND CONTINUE YOUR JOURNEY."
-                : "CREATE YOUR WEIRD CULTURE ACCOUNT AND STAY CLOSE TO THE NEXT DROP."}
-            </p>
-
-            <form
-              className="auth-form"
-              onSubmit={handleAuth}
-            >
-              {authMode ===
-                "signup" && (
-                <input
-                  type="text"
-                  placeholder="FULL NAME"
-                  value={
-                    authForm.fullName
-                  }
-                  onChange={(e) =>
-                    setAuthForm({
-                      ...authForm,
-                      fullName:
-                        e.target.value
-                    })
-                  }
-                  required
-                />
-              )}
-
-              <input
-                type="email"
-                placeholder="EMAIL ADDRESS"
-                value={
-                  authForm.email
-                }
-                onChange={(e) =>
-                  setAuthForm({
-                    ...authForm,
-                    email:
-                      e.target.value
-                  })
-                }
-                required
-              />
-
-              <input
-                type="password"
-                placeholder="PASSWORD"
-                value={
-                  authForm.password
-                }
-                onChange={(e) =>
-                  setAuthForm({
-                    ...authForm,
-                    password:
-                      e.target.value
-                  })
-                }
-                minLength={6}
-                required
-              />
-
+            <div className="auth-tabs">
               <button
-                className="auth-submit"
-                type="submit"
-              >
-                {authMode ===
-                "login"
-                  ? "LOG IN"
-                  : "CREATE ACCOUNT"}
-
-                <ArrowRight size={17} />
-              </button>
-            </form>
-
-            <div className="auth-switch">
-              <span>
-                {authMode ===
-                "login"
-                  ? "DON'T HAVE AN ACCOUNT?"
-                  : "ALREADY IN THE GANG?"}
-              </span>
-
-              <button
+                type="button"
+                className={
+                  authMode ===
+                  "login"
+                    ? "active"
+                    : ""
+                }
                 onClick={() =>
-                  setAuthMode(
-                    authMode ===
-                      "login"
-                      ? "signup"
-                      : "login"
+                  switchAuthMode(
+                    "login"
                   )
                 }
               >
-                {authMode ===
-                "login"
-                  ? "CREATE ACCOUNT"
-                  : "LOG IN"}
+                LOGIN
               </button>
+
+              <button
+                type="button"
+                className={
+                  authMode ===
+                  "signup"
+                    ? "active"
+                    : ""
+                }
+                onClick={() =>
+                  switchAuthMode(
+                    "signup"
+                  )
+                }
+              >
+                SIGN UP
+              </button>
+
+              <div
+                className={`auth-tab-slider ${
+                  authMode ===
+                  "signup"
+                    ? "right"
+                    : ""
+                }`}
+              />
+            </div>
+
+            <div className="auth-slide-window">
+              <div
+                className={`auth-slide-track ${
+                  authMode ===
+                  "signup"
+                    ? "signup-active"
+                    : ""
+                }`}
+              >
+                {/* LOGIN */}
+
+                <section className="auth-slide-panel">
+                  <span className="auth-kicker">
+                    WEIRD GANG / LOGIN
+                  </span>
+
+                  <h2>
+                    WELCOME BACK.
+                  </h2>
+
+                  <p className="auth-copy">
+                    LOG IN TO YOUR WEIRD
+                    CULTURE ACCOUNT AND
+                    CONTINUE YOUR JOURNEY.
+                  </p>
+
+                  <form
+                    className="auth-form"
+                    onSubmit={
+                      handleAuth
+                    }
+                  >
+                    <input
+                      type="email"
+                      placeholder="EMAIL ADDRESS"
+                      value={
+                        authForm.email
+                      }
+                      onChange={(
+                        e
+                      ) =>
+                        setAuthForm({
+                          ...authForm,
+                          email:
+                            e.target.value
+                        })
+                      }
+                      required
+                    />
+
+                    <div className="password-field">
+                      <input
+                        type={
+                          showLoginPassword
+                            ? "text"
+                            : "password"
+                        }
+                        placeholder="PASSWORD"
+                        value={
+                          authForm.password
+                        }
+                        onChange={(
+                          e
+                        ) =>
+                          setAuthForm({
+                            ...authForm,
+                            password:
+                              e.target.value
+                          })
+                        }
+                        minLength={6}
+                        required
+                        disabled={
+                          loginIsLocked
+                        }
+                      />
+
+                      <button
+                        type="button"
+                        className="password-toggle"
+                        onClick={() =>
+                          setShowLoginPassword(
+                            (
+                              value
+                            ) =>
+                              !value
+                          )
+                        }
+                        aria-label={
+                          showLoginPassword
+                            ? "Hide password"
+                            : "Show password"
+                        }
+                      >
+                        {showLoginPassword ? (
+                          <EyeOff
+                            size={18}
+                          />
+                        ) : (
+                          <Eye
+                            size={18}
+                          />
+                        )}
+                      </button>
+                    </div>
+
+                    {loginIsLocked ? (
+                      <div className="auth-lock-message">
+                        <strong>
+                          LOGIN LOCKED
+                        </strong>
+
+                        <span>
+                          TOO MANY FAILED
+                          ATTEMPTS.
+                        </span>
+
+                        <b>
+                          TRY AGAIN IN{" "}
+                          {formatLockTime(
+                            lockCountdown
+                          )}
+                        </b>
+                      </div>
+                    ) : (
+                      loginAttempts >
+                        0 && (
+                        <div className="auth-attempt-message">
+                          {MAX_LOGIN_ATTEMPTS -
+                            loginAttempts}{" "}
+                          LOGIN ATTEMPT
+                          {MAX_LOGIN_ATTEMPTS -
+                            loginAttempts ===
+                          1
+                            ? ""
+                            : "S"}{" "}
+                          REMAINING
+                        </div>
+                      )
+                    )}
+
+                    <button
+                      className="auth-submit"
+                      type="submit"
+                      disabled={
+                        loginIsLocked
+                      }
+                    >
+                      <span>
+                        {loginIsLocked
+                          ? "LOCKED"
+                          : "LOG IN"}
+                      </span>
+
+                      {!loginIsLocked && (
+                        <ArrowRight
+                          size={17}
+                        />
+                      )}
+                    </button>
+                  </form>
+                </section>
+
+                {/* SIGN UP */}
+
+                <section className="auth-slide-panel">
+                  <span className="auth-kicker">
+                    WEIRD GANG / JOIN
+                  </span>
+
+                  <h2>
+                    JOIN THE GANG.
+                  </h2>
+
+                  <p className="auth-copy">
+                    CREATE YOUR WEIRD
+                    CULTURE ACCOUNT AND
+                    STAY CLOSE TO THE NEXT
+                    DROP.
+                  </p>
+
+                  <form
+                    className="auth-form"
+                    onSubmit={
+                      handleAuth
+                    }
+                  >
+                    <input
+                      type="text"
+                      placeholder="FULL NAME"
+                      value={
+                        authForm.fullName
+                      }
+                      onChange={(
+                        e
+                      ) =>
+                        setAuthForm({
+                          ...authForm,
+                          fullName:
+                            e.target.value
+                        })
+                      }
+                      required
+                    />
+
+                    <input
+                      type="email"
+                      placeholder="EMAIL ADDRESS"
+                      value={
+                        authForm.email
+                      }
+                      onChange={(
+                        e
+                      ) =>
+                        setAuthForm({
+                          ...authForm,
+                          email:
+                            e.target.value
+                        })
+                      }
+                      required
+                    />
+
+                    <div className="password-field">
+                      <input
+                        type={
+                          showSignupPassword
+                            ? "text"
+                            : "password"
+                        }
+                        placeholder="CREATE PASSWORD"
+                        value={
+                          authForm.password
+                        }
+                        onChange={(
+                          e
+                        ) =>
+                          setAuthForm({
+                            ...authForm,
+                            password:
+                              e.target.value
+                          })
+                        }
+                        minLength={6}
+                        required
+                      />
+
+                      <button
+                        type="button"
+                        className="password-toggle"
+                        onClick={() =>
+                          setShowSignupPassword(
+                            (
+                              value
+                            ) =>
+                              !value
+                          )
+                        }
+                        aria-label={
+                          showSignupPassword
+                            ? "Hide password"
+                            : "Show password"
+                        }
+                      >
+                        {showSignupPassword ? (
+                          <EyeOff
+                            size={18}
+                          />
+                        ) : (
+                          <Eye
+                            size={18}
+                          />
+                        )}
+                      </button>
+                    </div>
+
+                    <button
+                      className="auth-submit"
+                      type="submit"
+                    >
+                      <span>
+                        CREATE ACCOUNT
+                      </span>
+
+                      <ArrowRight size={17} />
+                    </button>
+                  </form>
+                </section>
+              </div>
             </div>
           </div>
         </div>
@@ -2004,13 +2830,16 @@ function App() {
                 setAccountOpen(
                   false
                 );
+
                 openOrders();
               }}
             >
               <Package size={18} />
+
               <span>
                 MY ORDERS
               </span>
+
               <ChevronRight size={16} />
             </button>
 
@@ -2019,9 +2848,11 @@ function App() {
               onClick={logout}
             >
               <LogOut size={18} />
+
               <span>
                 LOG OUT
               </span>
+
               <ChevronRight size={16} />
             </button>
           </aside>
@@ -2302,7 +3133,9 @@ function App() {
             ) : (
               <div className="orders-list">
                 {orders.map(
-                  (order) => (
+                  (
+                    order
+                  ) => (
                     <div
                       className="order-card"
                       key={
@@ -2744,9 +3577,11 @@ function App() {
 
             <div className="new-drop-stamp">
               NEW
+
               <strong>
                 DROP
               </strong>
+
               2026
             </div>
           </div>
@@ -2778,7 +3613,9 @@ function App() {
               />
 
               <div className="collection-overlay">
-                <span>01</span>
+                <span>
+                  01
+                </span>
 
                 <h3>
                   GRAPHIC TEES
@@ -2806,7 +3643,9 @@ function App() {
               />
 
               <div className="collection-overlay">
-                <span>02</span>
+                <span>
+                  02
+                </span>
 
                 <h3>
                   BAGGY PANTS
@@ -2845,7 +3684,9 @@ function App() {
               />
 
               <div className="collection-overlay">
-                <span>03</span>
+                <span>
+                  03
+                </span>
 
                 <h3>
                   JERSEYS
@@ -2891,6 +3732,7 @@ function App() {
             <h2>
               JOIN THE
               <br />
+
               <span>
                 WEIRD GANG.
               </span>
@@ -3065,12 +3907,176 @@ function App() {
           </span>
         </div>
       </footer>
+
+      {/* AUTH DESIGN OVERRIDES */}
+
+      <style>{`
+        .auth-modal {
+          overflow: hidden;
+        }
+
+        .auth-tabs {
+          position: relative;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 0;
+          margin: 22px 0 28px;
+          border: 1px solid rgba(255,255,255,.14);
+          background: rgba(255,255,255,.04);
+          min-height: 48px;
+          padding: 4px;
+        }
+
+        .auth-tabs button {
+          position: relative;
+          z-index: 2;
+          border: 0;
+          background: transparent;
+          color: rgba(245,245,242,.52);
+          font: inherit;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: .16em;
+          cursor: pointer;
+          transition: color .25s ease;
+        }
+
+        .auth-tabs button.active {
+          color: #080808;
+        }
+
+        .auth-tab-slider {
+          position: absolute;
+          z-index: 1;
+          top: 4px;
+          bottom: 4px;
+          left: 4px;
+          width: calc(50% - 4px);
+          background: #f5f5f2;
+          transition: transform .42s cubic-bezier(.22,.61,.36,1);
+        }
+
+        .auth-tab-slider.right {
+          transform: translateX(100%);
+        }
+
+        .auth-slide-window {
+          width: 100%;
+          overflow: hidden;
+        }
+
+        .auth-slide-track {
+          display: flex;
+          width: 200%;
+          transform: translateX(0);
+          transition: transform .48s cubic-bezier(.22,.61,.36,1);
+          will-change: transform;
+        }
+
+        .auth-slide-track.signup-active {
+          transform: translateX(-50%);
+        }
+
+        .auth-slide-panel {
+          width: 50%;
+          flex: 0 0 50%;
+          box-sizing: border-box;
+        }
+
+        .password-field {
+          position: relative;
+          width: 100%;
+        }
+
+        .password-field input {
+          width: 100%;
+          padding-right: 48px !important;
+          box-sizing: border-box;
+        }
+
+        .password-toggle {
+          position: absolute;
+          top: 50%;
+          right: 14px;
+          transform: translateY(-50%);
+          width: 30px;
+          height: 30px;
+          display: grid;
+          place-items: center;
+          border: 0;
+          background: transparent;
+          color: rgba(245,245,242,.52);
+          cursor: pointer;
+          padding: 0;
+          transition: color .2s ease;
+        }
+
+        .password-toggle:hover {
+          color: #f5f5f2;
+        }
+
+        .auth-lock-message {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          padding: 13px 14px;
+          margin-top: -4px;
+          border: 1px solid rgba(215,25,32,.45);
+          background: rgba(215,25,32,.08);
+          color: #f5f5f2;
+        }
+
+        .auth-lock-message strong {
+          color: #d71920;
+          font-size: 11px;
+          letter-spacing: .14em;
+        }
+
+        .auth-lock-message span,
+        .auth-lock-message b {
+          font-size: 10px;
+          letter-spacing: .08em;
+        }
+
+        .auth-lock-message b {
+          margin-top: 3px;
+          font-size: 13px;
+          letter-spacing: .12em;
+        }
+
+        .auth-attempt-message {
+          margin-top: -5px;
+          color: #8a8a8a;
+          font-size: 10px;
+          letter-spacing: .1em;
+        }
+
+        .auth-submit:disabled {
+          opacity: .45;
+          cursor: not-allowed;
+        }
+
+        @media (max-width: 560px) {
+          .auth-modal {
+            width: calc(100% - 28px);
+            max-height: calc(100vh - 28px);
+            overflow-y: auto;
+          }
+
+          .auth-tabs {
+            margin-top: 18px;
+            margin-bottom: 24px;
+          }
+        }
+      `}</style>
     </div>
   );
 }
 
 createRoot(
-  document.getElementById("root")
+  document.getElementById(
+    "root"
+  )
 ).render(
   <React.StrictMode>
     <App />
