@@ -642,6 +642,13 @@ const [adminOpen, setAdminOpen] =
 
   // ADMIN ROLE CHECK
   useEffect(() => {
+      const openAdmin = () => {
+    window.location.hash = "admin";
+  };
+
+  const closeAdmin = () => {
+    window.location.hash = "";
+  };
     const loadUserRole = async () => {
       if (!supabase || !user) {
         setIsAdmin(false);
