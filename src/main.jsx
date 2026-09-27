@@ -23,6 +23,7 @@ import {
   EyeOff,
   ShieldCheck
 } from "lucide-react";
+import AdminPanel from "./AdminPanel";
 import { createClient } from "@supabase/supabase-js";
 import "./styles.css";
 
