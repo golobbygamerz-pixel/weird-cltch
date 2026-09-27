@@ -289,7 +289,13 @@ function App() {
 
   const [ordersLoading, setOrdersLoading] =
     useState(false);
+const [isAdmin, setIsAdmin] =
+  useState(false);
 
+const [adminOpen, setAdminOpen] =
+  useState(
+    window.location.hash === "#admin"
+  );
   /* =========================
      AUTH LOCK HELPERS
   ========================= */
