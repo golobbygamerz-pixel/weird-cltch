@@ -20,7 +20,8 @@ import {
   Package,
   ChevronRight,
   Eye,
-  EyeOff
+  EyeOff,
+  ShieldCheck
 } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import "./styles.css";
