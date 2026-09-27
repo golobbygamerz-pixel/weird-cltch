@@ -556,7 +556,7 @@ const [adminOpen, setAdminOpen] =
      AUTH LOCK SYNC
   ========================= */
 
-  useEffect(() => {
+    useEffect(() => {
     if (
       authMode !== "login" ||
       !authOpen
@@ -619,7 +619,8 @@ const [adminOpen, setAdminOpen] =
     loginLockedUntil,
     authForm.email
   ]);
-    useEffect(() => {
+
+  useEffect(() => {
     const syncHash = () => {
       setAdminOpen(
         window.location.hash === "#admin"
@@ -638,6 +639,35 @@ const [adminOpen, setAdminOpen] =
       );
     };
   }, []);
+
+  // ADMIN ROLE CHECK
+  useEffect(() => {
+    const loadUserRole = async () => {
+      if (!supabase || !user) {
+        setIsAdmin(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error(
+          "Failed to load user role:",
+          error
+        );
+        setIsAdmin(false);
+        return;
+      }
+
+      setIsAdmin(data?.role === "admin");
+    };
+
+    loadUserRole();
+  }, [user]);
 
   /* =========================
      AUTH SESSION
