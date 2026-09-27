@@ -619,6 +619,25 @@ const [adminOpen, setAdminOpen] =
     loginLockedUntil,
     authForm.email
   ]);
+    useEffect(() => {
+    const syncHash = () => {
+      setAdminOpen(
+        window.location.hash === "#admin"
+      );
+    };
+
+    window.addEventListener(
+      "hashchange",
+      syncHash
+    );
+
+    return () => {
+      window.removeEventListener(
+        "hashchange",
+        syncHash
+      );
+    };
+  }, []);
 
   /* =========================
      AUTH SESSION
