@@ -659,11 +659,11 @@ const closeAdmin = () => {
 // ADMIN ROLE CHECK
 
 useEffect(() => {
-  const loadUserRole = async () => 
-      if (!supabase || !user) {
-        setIsAdmin(false);
-        return;
-      }
+  const loadUserRole = async () => {
+    if (!supabase || !user) {
+      setIsAdmin(false);
+      return;
+    }
 
       const { data, error } = await supabase
         .from("profiles")
