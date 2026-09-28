@@ -640,15 +640,26 @@ const [adminOpen, setAdminOpen] =
     };
   }, []);
 
-  // ADMIN ROLE CHECK
-  useEffect(() => {
-      const openAdmin = () => {
-    window.location.hash = "admin";
-  };
+  // ADMIN NAVIGATION
 
-  const closeAdmin = () => {
+const openAdmin = () => {
+  setAccountOpen(false);
+  setAdminOpen(true);
+  window.location.hash = "admin";
+};
+
+const closeAdmin = () => {
+  setAdminOpen(false);
+
+  if (window.location.hash === "#admin") {
     window.location.hash = "";
-  };
+  }
+};
+
+// ADMIN ROLE CHECK
+
+useEffect(() => {
+  const loadUserRole = async () => {
     const loadUserRole = async () => {
       if (!supabase || !user) {
         setIsAdmin(false);
