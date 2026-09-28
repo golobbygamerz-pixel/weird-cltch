@@ -744,30 +744,32 @@ const [adminOpen, setAdminOpen] =
   ========================= */
 
   useEffect(() => {
-    document.body.style.overflow =
-      menuOpen ||
-      cartOpen ||
-      productModal ||
-      authOpen ||
-      accountOpen ||
-      checkoutOpen ||
-      ordersOpen
-        ? "hidden"
-        : "";
+  document.body.style.overflow =
+    menuOpen ||
+    cartOpen ||
+    productModal ||
+    authOpen ||
+    accountOpen ||
+    checkoutOpen ||
+    ordersOpen ||
+    adminOpen
+      ? "hidden"
+      : "";
 
-    return () => {
-      document.body.style.overflow =
-        "";
-    };
-  }, [
-    menuOpen,
-    cartOpen,
-    productModal,
-    authOpen,
-    accountOpen,
-    checkoutOpen,
-    ordersOpen
-  ]);
+  return () => {
+    document.body.style.overflow =
+      "";
+  };
+}, [
+  menuOpen,
+  cartOpen,
+  productModal,
+  authOpen,
+  accountOpen,
+  checkoutOpen,
+  ordersOpen,
+  adminOpen
+]);
 
   /* =========================
      USER PROFILE
