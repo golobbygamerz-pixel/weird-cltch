@@ -2831,97 +2831,110 @@ const [adminOpen, setAdminOpen] =
 
       {/* ACCOUNT */}
 
-      {accountOpen && (
-        <div
-          className="side-panel-backdrop"
+{accountOpen && (
+  <div
+    className="side-panel-backdrop"
+    onClick={() =>
+      setAccountOpen(false)
+    }
+  >
+    <aside
+      className="account-panel"
+      onClick={(e) =>
+        e.stopPropagation()
+      }
+    >
+      <div className="account-panel-head">
+        <div>
+          <span>
+            WEIRD GANG / ACCOUNT
+          </span>
+
+          <h2>
+            ACCOUNT
+          </h2>
+        </div>
+
+        <button
+          className="drawer-close"
           onClick={() =>
-            setAccountOpen(
-              false
-            )
+            setAccountOpen(false)
           }
         >
-          <aside
-            className="account-panel"
-            onClick={(e) =>
-              e.stopPropagation()
-            }
-          >
-            <div className="account-panel-head">
-              <div>
-                <span>
-                  WEIRD GANG / ACCOUNT
-                </span>
+          <X size={21} />
+        </button>
+      </div>
 
-                <h2>
-                  ACCOUNT
-                </h2>
-              </div>
-
-              <button
-                className="drawer-close"
-                onClick={() =>
-                  setAccountOpen(
-                    false
-                  )
-                }
-              >
-                <X size={21} />
-              </button>
-            </div>
-
-            <div className="account-card">
-              <div className="account-avatar">
-                <User size={23} />
-              </div>
-
-              <div>
-                <strong>
-                  {user
-                    ?.user_metadata
-                    ?.full_name ||
-                    "WEIRD MEMBER"}
-                </strong>
-
-                <span>
-                  {user?.email}
-                </span>
-              </div>
-            </div>
-
-            <button
-              className="account-action"
-              onClick={() => {
-                setAccountOpen(
-                  false
-                );
-
-                openOrders();
-              }}
-            >
-              <Package size={18} />
-
-              <span>
-                MY ORDERS
-              </span>
-
-              <ChevronRight size={16} />
-            </button>
-
-            <button
-              className="account-action logout-action"
-              onClick={logout}
-            >
-              <LogOut size={18} />
-
-              <span>
-                LOG OUT
-              </span>
-
-              <ChevronRight size={16} />
-            </button>
-          </aside>
+      <div className="account-card">
+        <div className="account-avatar">
+          <User size={23} />
         </div>
+
+        <div>
+          <strong>
+            {user
+              ?.user_metadata
+              ?.full_name ||
+              "WEIRD MEMBER"}
+          </strong>
+
+          <span>
+            {user?.email}
+          </span>
+        </div>
+      </div>
+
+      <button
+        className="account-action"
+        onClick={() => {
+          setAccountOpen(false);
+          openOrders();
+        }}
+      >
+        <Package size={18} />
+
+        <span>
+          MY ORDERS
+        </span>
+
+        <ChevronRight size={16} />
+      </button>
+
+      {/* ADMIN PANEL */}
+
+      {isAdmin && (
+        <button
+          className="account-action"
+          onClick={() => {
+            setAccountOpen(false);
+            openAdmin();
+          }}
+        >
+          <ShieldCheck size={18} />
+
+          <span>
+            ADMIN PANEL
+          </span>
+
+          <ChevronRight size={16} />
+        </button>
       )}
+
+      <button
+        className="account-action logout-action"
+        onClick={logout}
+      >
+        <LogOut size={18} />
+
+        <span>
+          LOG OUT
+        </span>
+
+        <ChevronRight size={16} />
+      </button>
+    </aside>
+  </div>
+)}
 
       {/* CHECKOUT */}
 
