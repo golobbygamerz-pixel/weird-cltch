@@ -100,74 +100,59 @@ function AdminPanel({
   ========================= */
 
   const loadAdminData = async (
-    showRefresh = false
-  ) => {
-    if (
-      !supabase ||
-      !user ||
-      !adminAuthorized
-    ) {
-      return;
+  showRefresh = false
+) => {
+  if (
+    !supabase ||
+    !user
+  ) {
+    return;
+  }
+
+  if (showRefresh) {
+    setRefreshing(true);
+  } else {
+    setLoading(true);
+  }
+
+  try {
+    const [ordersResult, customersResult] = await Promise.all([
+      supabase
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false }),
+
+      supabase
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: false })
+    ]);
+
+    if (ordersResult.error) {
+      throw ordersResult.error;
     }
 
-    if (showRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
+    if (customersResult.error) {
+      throw customersResult.error;
     }
 
+    setOrders(ordersResult.data || []);
+    setCustomers(customersResult.data || []);
     setErrorMessage("");
+  } catch (error) {
+    console.error("Admin data error:", error);
 
-    try {
-      const [
-        ordersResult,
-        customersResult
-      ] = await Promise.all([
-        supabase
-          .from("orders")
-          .select("*")
-          .order("created_at", {
-            ascending: false
-          }),
-
-        supabase
-          .from("profiles")
-          .select("*")
-          .order("created_at", {
-            ascending: false
-          })
-      ]);
-
-      if (ordersResult.error) {
-        throw ordersResult.error;
-      }
-
-      if (customersResult.error) {
-        throw customersResult.error;
-      }
-
-      setOrders(
-        ordersResult.data || []
-      );
-
-      setCustomers(
-        customersResult.data || []
-      );
-    } catch (error) {
-      console.error(
-        "Admin data error:",
-        error
-      );
-
-      setErrorMessage(
-        error?.message ||
-          "COULD NOT LOAD ADMIN DATA."
-      );
-    } finally {
-      setLoading(false);
+    setErrorMessage(
+      error?.message || "FAILED TO LOAD ADMIN DATA."
+    );
+  } finally {
+    if (showRefresh) {
       setRefreshing(false);
+    } else {
+      setLoading(false);
     }
-  };
+  }
+};
 
   /* =========================
      ADMIN ACCESS CHECK
