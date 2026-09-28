@@ -659,8 +659,7 @@ const closeAdmin = () => {
 // ADMIN ROLE CHECK
 
 useEffect(() => {
-  const loadUserRole = async () => {
-    const loadUserRole = async () => {
+  const loadUserRole = async () => 
       if (!supabase || !user) {
         setIsAdmin(false);
         return;
