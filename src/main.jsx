@@ -1426,23 +1426,25 @@ const [adminOpen, setAdminOpen] =
   };
 
   const logout = async () => {
-    if (!supabase) {
-      return;
-    }
+  if (!supabase) {
+    return;
+  }
 
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.error(
-        "Logout error:",
-        error
-      );
-    }
+  try {
+    await supabase.auth.signOut();
+  } catch (error) {
+    console.error(
+      "Logout error:",
+      error
+    );
+  }
 
-    setUser(null);
-    setAccountOpen(false);
-    setOrders([]);
-  };
+  setUser(null);
+  setIsAdmin(false);
+  setAdminOpen(false);
+  setAccountOpen(false);
+  setOrders([]);
+};
 
   /* =========================
      PROFILE
