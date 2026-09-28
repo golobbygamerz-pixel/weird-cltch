@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   BarChart3,
   Check,
-  ChevronDown,
   Clock3,
   Eye,
   IndianRupee,
@@ -72,6 +71,12 @@ function AdminPanel({
   const [loading, setLoading] =
     useState(true);
 
+  const [checkingAccess, setCheckingAccess] =
+    useState(true);
+
+  const [adminAuthorized, setAdminAuthorized] =
+    useState(false);
+
   const [refreshing, setRefreshing] =
     useState(false);
 
@@ -97,7 +102,11 @@ function AdminPanel({
   const loadAdminData = async (
     showRefresh = false
   ) => {
-    if (!supabase || !user) {
+    if (
+      !supabase ||
+      !user ||
+      !adminAuthorized
+    ) {
       return;
     }
 
@@ -160,9 +169,94 @@ function AdminPanel({
     }
   };
 
+  /* =========================
+     ADMIN ACCESS CHECK
+  ========================= */
+
   useEffect(() => {
-    loadAdminData();
-  }, [user]);
+    let cancelled = false;
+
+    const checkAdminAccess = async () => {
+      setCheckingAccess(true);
+      setLoading(true);
+      setErrorMessage("");
+      setAdminAuthorized(false);
+
+      if (!supabase || !user) {
+        if (!cancelled) {
+          setErrorMessage(
+            "PLEASE LOG IN TO ACCESS ADMIN PANEL."
+          );
+
+          setCheckingAccess(false);
+          setLoading(false);
+        }
+
+        return;
+      }
+
+      try {
+        const {
+          data,
+          error
+        } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (error) {
+          throw error;
+        }
+
+        if (data?.role !== "admin") {
+          if (!cancelled) {
+            setAdminAuthorized(false);
+
+            setErrorMessage(
+              "ACCESS DENIED. ADMIN ONLY."
+            );
+
+            setCheckingAccess(false);
+            setLoading(false);
+          }
+
+          return;
+        }
+
+        if (!cancelled) {
+          setAdminAuthorized(true);
+          setCheckingAccess(false);
+        }
+
+        if (!cancelled) {
+          await loadAdminData();
+        }
+      } catch (error) {
+        console.error(
+          "Admin access check error:",
+          error
+        );
+
+        if (!cancelled) {
+          setAdminAuthorized(false);
+
+          setErrorMessage(
+            "COULD NOT VERIFY ADMIN ACCESS."
+          );
+
+          setCheckingAccess(false);
+          setLoading(false);
+        }
+      }
+    };
+
+    checkAdminAccess();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, supabase]);
 
   /* =========================
      METRICS
@@ -331,7 +425,11 @@ function AdminPanel({
     status,
     paymentStatus
   ) => {
-    if (!supabase) {
+    if (
+      !supabase ||
+      !user ||
+      !adminAuthorized
+    ) {
       return;
     }
 
@@ -418,6 +516,177 @@ function AdminPanel({
       icon: Package
     }
   ];
+
+  /* =========================
+     ACCESS CHECK SCREEN
+  ========================= */
+
+  if (
+    checkingAccess ||
+    loading && !adminAuthorized
+  ) {
+    return (
+      <div className="wc-admin wc-admin-access">
+        <div className="wc-admin-access-box">
+          <RefreshCw
+            size={25}
+            className="wc-spin"
+          />
+
+          <strong>
+            VERIFYING ADMIN ACCESS...
+          </strong>
+
+          <span>
+            PLEASE WAIT.
+          </span>
+        </div>
+
+        <style>{`
+          .wc-admin-access {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: grid;
+            place-items: center;
+            background: #080808;
+            color: #f5f5f2;
+            font-family: Inter, Arial, sans-serif;
+          }
+
+          .wc-admin-access-box {
+            display: grid;
+            justify-items: center;
+            gap: 12px;
+            text-align: center;
+          }
+
+          .wc-admin-access-box svg {
+            color: #d71920;
+          }
+
+          .wc-admin-access-box strong {
+            font-size: 12px;
+            letter-spacing: .14em;
+          }
+
+          .wc-admin-access-box span {
+            color: #8a8a8a;
+            font-size: 8px;
+            letter-spacing: .14em;
+          }
+
+          .wc-spin {
+            animation: wcSpin 1s linear infinite;
+          }
+
+          @keyframes wcSpin {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  if (!adminAuthorized) {
+    return (
+      <div className="wc-admin wc-admin-access">
+        <div className="wc-admin-denied">
+          <ShieldCheck
+            size={42}
+          />
+
+          <span>
+            WEIRD CULTURE
+          </span>
+
+          <h1>
+            ACCESS DENIED.
+          </h1>
+
+          <p>
+            {errorMessage ||
+              "ADMIN ACCESS REQUIRED."}
+          </p>
+
+          <button
+            onClick={onClose}
+          >
+            <ArrowLeft
+              size={16}
+            />
+
+            BACK TO STORE
+          </button>
+        </div>
+
+        <style>{`
+          .wc-admin-access {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: grid;
+            place-items: center;
+            background: #080808;
+            color: #f5f5f2;
+            font-family: Inter, Arial, sans-serif;
+          }
+
+          .wc-admin-denied {
+            width: min(420px, calc(100% - 32px));
+            padding: 32px 24px;
+            border: 1px solid #252525;
+            background: #111;
+            text-align: center;
+          }
+
+          .wc-admin-denied svg {
+            margin-bottom: 18px;
+            color: #d71920;
+          }
+
+          .wc-admin-denied > span {
+            display: block;
+            color: #8a8a8a;
+            font-size: 8px;
+            font-weight: 700;
+            letter-spacing: .2em;
+          }
+
+          .wc-admin-denied h1 {
+            margin: 10px 0;
+            font-size: 34px;
+            letter-spacing: -.05em;
+          }
+
+          .wc-admin-denied p {
+            margin: 0 0 22px;
+            color: #8a8a8a;
+            font-size: 9px;
+            letter-spacing: .08em;
+            line-height: 1.6;
+          }
+
+          .wc-admin-denied button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            height: 42px;
+            padding: 0 15px;
+            border: 0;
+            background: #f5f5f2;
+            color: #080808;
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: .12em;
+            cursor: pointer;
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   /* =========================
      ORDER DETAIL
