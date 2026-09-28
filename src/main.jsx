@@ -4133,10 +4133,18 @@ const [adminOpen, setAdminOpen] =
           }
         }
       `}</style>
+
+      {adminOpen && (
+        <AdminPanel
+          supabase={supabase}
+          user={user}
+          products={products}
+          onClose={closeAdmin}
+        />
+      )}
     </div>
   );
 }
-
 createRoot(
   document.getElementById(
     "root"
