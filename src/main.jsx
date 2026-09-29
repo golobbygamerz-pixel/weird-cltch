@@ -1749,19 +1749,16 @@ useEffect(() => {
       }
     };
 
-  const openOrders = () => {
-  if (!user) {
-    openAuth("login");
-    return;
-  }
+  const openOrders =
+  async () => {
+    if (!user) {
+      openAuth("login");
+      return;
+    }
 
-  setAccountOpen(false);
-  setOrdersOpen(true);
-
-  loadOrders().catch((error) => {
-    console.error("Orders loading error:", error);
-  });
-};
+    setOrdersOpen(true);
+    await loadOrders();
+  };
 
   const modalVariants =
     productModal?.variants || [];
