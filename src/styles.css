@@ -2885,16 +2885,41 @@ img {
 .auth-backdrop,
 .checkout-backdrop,
 .side-panel-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 300;
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 10000 !important;
   background: rgba(0, 0, 0, 0.78);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  display: flex;
+  display: flex !important;
   align-items: center;
   justify-content: center;
   padding: 20px;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+.side-panel-backdrop {
+  justify-content: flex-end !important;
+  align-items: stretch !important;
+  padding: 0 !important;
+}
+
+.account-panel,
+.orders-panel {
+  position: relative !important;
+  z-index: 10001 !important;
+  width: min(500px, 100vw);
+  height: 100dvh;
+  padding: 28px;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+  background: #0b0b0b !important;
+  box-shadow: -30px 0 80px rgba(0, 0, 0, 0.35);
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
 }
 
 .auth-modal {
